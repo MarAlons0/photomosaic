@@ -17,7 +17,7 @@ _Last updated: 2026-10-05_
 
 ## 🟢 Low / Nice to have
 - [ ] **Zoom-out mode** — reverse direction (photo shrinks into a tile of a bigger mosaic). `[idea]`
-- [ ] **Photo caption** — optionally show the filename/date of the photo filling the screen. `[feature]`
+- [ ] **Photo caption** — optionally show the location/date of the photo filling the screen. `[feature]`
 - [ ] **Native `.saver` bundle** — Swift/ScreenSaver.framework port for smoother playback. `[idea]`
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
