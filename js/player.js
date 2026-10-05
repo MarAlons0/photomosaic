@@ -11,6 +11,10 @@
  * giving screen = f + s*(world - f) for s from 1 to N. Scale is interpolated
  * in log space so the zoom feels constant-speed.
  *
+ * Zoom-out cycles play the same camera path backwards: photo b fills the
+ * screen as a tile, and the camera pulls back until a's mosaic resolves into a.
+ * Either way, the last frame of a cycle is the first frame of the next.
+ *
  * Scaling to big libraries:
  *   - Rotating pool: each mosaic is built from POOL_SIZE photos dealt from a
  *     shuffled deck, so match cost is bounded and every photo comes round.
@@ -108,10 +112,16 @@
     }
 
     async start(first) {
-      const a = first == null ? (Math.random() * this.photos.length) | 0 : first;
-      this.pinned = new Set([a]);
-      await Promise.all([this.request(a, 'hires', true), this.request(a, 'tiny', true)]);
-      this.startCycle(a);
+      const shown = first == null ? (Math.random() * this.photos.length) | 0 : first;
+      this.upcoming = this.pickUpcoming(shown);
+      this.pinned = new Set([shown, this.upcoming]);
+      await Promise.all([
+        this.request(shown, 'hires', true),
+        this.request(shown, 'tiny', true),
+        this.request(this.upcoming, 'tiny', true),
+        this.request(this.upcoming, 'hires', true),
+      ]);
+      this.beginCycle(shown);
       if (!this.running) {
         this.running = true;
         this.last = performance.now();
@@ -122,9 +132,29 @@
     stop() { this.running = false; }
 
     // Rebuild the current cycle (after a resize or a grid-size change).
-    restart() { if (this.cycle) this.startCycle(this.cycle.a); }
+    restart() {
+      const c = this.cycle;
+      if (c) this.beginCycle(c.shown, true, c.dir === 'out' ? c.a : undefined);
+    }
 
-    next() { if (this.cycle) this.startCycle(this.cycle.b); }
+    next() { if (this.cycle) this.beginCycle(this.cycle.end); }
+
+    // Direction of the next cycle: 'in', 'out', or alternating between them.
+    _direction(restarting) {
+      const d = this.settings.direction;
+      if (d === 'alternate') {
+        if (!this.cycle) return 'in';
+        if (restarting) return this.cycle.dir;
+        return this.cycle.dir === 'in' ? 'out' : 'in';
+      }
+      return d === 'out' ? 'out' : 'in';
+    }
+
+    // Start a cycle that opens on photo `shown` filling the screen.
+    beginCycle(shown, restarting = false, mosaicPhoto) {
+      if (this._direction(restarting) === 'out') this.startCycleOut(shown, mosaicPhoto);
+      else this.startCycle(shown);
+    }
 
     /* ---------- on-demand image versions ---------- */
 
@@ -208,25 +238,71 @@
       return [...picked];
     }
 
-    startCycle(a) {
-      const { photos, W, H } = this;
-      const N = this.settings.grid;
-      const A = photos[a];
+    // A random photo to build the next mosaic from, avoiding recently shown ones.
+    pickUpcoming(exclude) {
+      const n = this.photos.length;
+      for (let t = 0; t < 50; t++) {
+        const i = (Math.random() * n) | 0;
+        if (i !== exclude && !this.recent.includes(i)) return i;
+      }
+      return (exclude + 1 + ((Math.random() * (n - 1)) | 0)) % n;
+    }
 
-      // Analyse A from the sharpest version we're allowed to read pixels from
+    _remember(i) {
+      this.recent.push(i);
+      const keep = Math.min(RECENT, Math.floor(this.photos.length / 2));
+      while (this.recent.length > keep) this.recent.shift();
+    }
+
+    // Features of photo y's N x N cells, and its mosaic.
+    _mosaicOf(y, N) {
+      // Analyse from the sharpest version we're allowed to read pixels from
       // (micro is always readable, so this never comes up empty).
-      const readable = A.levels.filter(l => !l.tainted).pop();
+      const readable = this.photos[y].levels.filter(l => !l.tainted).pop();
       const cells = PM.gridFeatures(readable.src, readable.crop, N, 2);
-
-      const assign = PM.buildMosaic(cells, N, this.drawPool(a), photos.map(p => p.feat), {
+      const assign = PM.buildMosaic(cells, N, this.drawPool(y), this.photos.map(p => p.feat), {
         spacing: this.settings.spacing,
         penalty: 60,
       });
+      return { cells, assign };
+    }
+
+    // Install a cycle and fetch what it needs: full size for both photos and the
+    // tiles around the target cell, plus the upcoming photo for analysis.
+    _install(dir, a, b, N, assign, cell) {
+      const { W, H } = this;
+      const col = cell % N, row = (cell / N) | 0;
+      this.cycle = {
+        dir, a, b, N, assign, cell,
+        shown: dir === 'out' ? b : a,   // fills the screen when the cycle starts
+        end: dir === 'out' ? a : b,     // ... and when it ends
+        tx: (col * W) / N, ty: (row * H) / N,
+      };
+      this.elapsed = 0;
+      this.buildTexture();
+
+      const near = [];
+      for (let r = row - 1; r <= row + 1; r++) {
+        for (let c = col - 1; c <= col + 1; c++) {
+          if (r >= 0 && c >= 0 && r < N && c < N) near.push(assign[r * N + c]);
+        }
+      }
+      this.upcoming = this.pickUpcoming(this.cycle.end);
+      this.pinned = new Set([a, b, this.upcoming, ...near]);
+      this.request(a, 'hires', true);
+      this.request(b, 'hires', true);
+      near.forEach(i => this.request(i, 'hires', true));
+      this.request(this.cycle.end, 'tiny', true);
+      this.request(this.upcoming, 'tiny', true);
+    }
+
+    // Zoom in: photo a dissolves into its mosaic; dive into a tile b.
+    startCycle(a) {
+      const N = this.settings.grid;
+      const { assign } = this._mosaicOf(a, N);
 
       // Zoom into a cell near the middle whose photo hasn't been shown lately.
-      this.recent.push(a);
-      const keep = Math.min(RECENT, Math.floor(photos.length / 2));
-      while (this.recent.length > keep) this.recent.shift();
+      this._remember(a);
       const lo = Math.floor(N * 0.2), hi = Math.ceil(N * 0.8);
       const central = [], fresh = [];
       for (let r = lo; r < hi; r++) {
@@ -238,25 +314,55 @@
       }
       const choices = fresh.length ? fresh : central;
       const cell = choices[(Math.random() * choices.length) | 0];
-      const col = cell % N, row = (cell / N) | 0;
-      const b = assign[cell];
+      this._install('in', a, assign[cell], N, assign, cell);
+    }
 
-      this.cycle = { a, b, N, assign, cell, tx: (col * W) / N, ty: (row * H) / N };
-      this.elapsed = 0;
-      this.buildTexture();
+    // Zoom out: photo x, filling the screen, turns out to be one tile of photo y's
+    // mosaic; pull back until y's tiles blend into y itself.
+    startCycleOut(x, y = this.upcoming) {
+      if (y == null || y === x) y = this.pickUpcoming(x);
+      const N = this.settings.grid;
+      const { cells, assign } = this._mosaicOf(y, N);
 
-      // Keep A; fetch B (fills the screen at the end, analysed next cycle) and the
-      // tiles around it at full size.
-      const near = [];
-      for (let r = row - 1; r <= row + 1; r++) {
-        for (let c = col - 1; c <= col + 1; c++) {
-          if (r >= 0 && c >= 0 && r < N && c < N) near.push(assign[r * N + c]);
+      // Put x in a central cell whose colours suit it (random among the best few).
+      const fx = this.photos[x].feat;
+      const lo = Math.floor(N * 0.2), hi = Math.ceil(N * 0.8);
+      const scored = [];
+      for (let r = lo; r < hi; r++) {
+        for (let c = lo; c < hi; c++) {
+          const i = r * N + c;
+          let d = 0;
+          for (let j = 0; j < 12; j++) { const e = cells[i * 12 + j] - fx[j]; d += e * e; }
+          scored.push([d, i]);
         }
       }
-      this.pinned = new Set([a, b, ...near]);
-      this.request(b, 'hires', true);
-      this.request(b, 'tiny', true);
-      near.forEach(i => this.request(i, 'hires', true));
+      scored.sort((p, q) => p[0] - q[0]);
+      const cell = scored[(Math.random() * Math.min(5, scored.length)) | 0][1];
+      assign[cell] = x;
+
+      this._remember(x);
+      this._install('out', y, x, N, assign, cell);
+      this.prefetch();
+    }
+
+    /*
+     * Zooming out, tiles first appear large, so load their sharper versions up front
+     * (during the pause on the photo) instead of as they grow. Mid-size requests are
+     * queued last so they load first.
+     */
+    prefetch() {
+      const { W, H } = this;
+      const { N, assign, tx, ty } = this.cycle;
+      const fx = (N * tx) / (N - 1), fy = (N * ty) / (N - 1);
+      const cw = W / N, ch = H / N;
+      for (const [kind, at] of [['tiny', this.tinyAt], ['mid', this.midAt]]) {
+        const s = Math.min(N, Math.max(1, at / cw));
+        const c0 = Math.max(0, Math.floor((fx - fx / s) / cw)), c1 = Math.min(N - 1, Math.ceil((fx + (W - fx) / s) / cw) - 1);
+        const r0 = Math.max(0, Math.floor((fy - fy / s) / ch)), r1 = Math.min(N - 1, Math.ceil((fy + (H - fy) / s) / ch) - 1);
+        for (let r = r0; r <= r1; r++) {
+          for (let c = c0; c <= c1; c++) this.request(assign[r * N + c], kind);
+        }
+      }
     }
 
     /*
@@ -296,10 +402,10 @@
       let p = 0;
       if (this.elapsed > hold) {
         const u = (this.elapsed - hold) / duration;
-        if (u >= 1) this.startCycle(this.cycle.b);
+        if (u >= 1) this.beginCycle(this.cycle.end);
         else p = easeInOut(u);
       }
-      this.draw(p);
+      this.draw(this.cycle.dir === 'out' ? 1 - p : p);
       requestAnimationFrame(this._frame);
     }
 

@@ -2,7 +2,8 @@
 
 A browser-based tribute to the Mac OS X Leopard **Mosaic** screen saver: a photo fills the screen,
 dissolves into a mosaic made of your other photos, and the camera dives into one tile until *that*
-photo fills the screen — and the cycle repeats forever.
+photo fills the screen — and the cycle repeats forever. It can also run in reverse (each photo
+shrinks into a tile of the next) or alternate between the two.
 
 No build step, no server, no dependencies in the browser. Plain HTML + JavaScript.
 
@@ -94,6 +95,10 @@ file:///Users/<you>/Documents/Claude-code-projects/Photomosaic/index.html?saver=
   a full-screen photo. The camera is a pure zoom about the fixed point `f = N·t / (N−1)` (t = the target
   tile's corner), interpolated in log space so it feels constant-speed. When the zoom ends, the tile *is*
   the next photo — the next cycle starts from the identical frame.
+- **Zoom out.** The same camera path played backwards: the current photo is placed in the central
+  cell of the next photo's mosaic whose colours suit it best, and the camera pulls back until that
+  mosaic resolves into the next photo. Either direction ends on exactly the frame the next cycle
+  starts with, so they can alternate seamlessly.
 - **Colour blend.** The big photo is faded over its own mosaic (fully at first, then faintly) — the
   classic photomosaic trick that makes the large image read clearly.
 - **Level of detail.** Each photo exists at ~64 px (always loaded), ~128 px, ~320 px and full screen

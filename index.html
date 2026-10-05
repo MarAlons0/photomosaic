@@ -54,6 +54,9 @@
   .row label { display: flex; justify-content: space-between; font-size: 13px; }
   .row label span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
   .row input { width: 100%; accent-color: var(--accent); }
+  .row select { width: 100%; margin-top: 4px; font: inherit; font-size: 13px; color: var(--text);
+    background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .row select option { color: #000; }
   .row .note { font-size: 11.5px; color: var(--muted); }
   .panel-actions { display: flex; gap: 8px; margin-top: 4px; }
   .panel-actions button { flex: 1; text-align: center; padding: 8px; font-size: 13px; }
@@ -97,6 +100,15 @@
 <div id="panel" hidden>
   <h2>Settings</h2>
   <div class="row">
+    <label for="set-direction"><span>Direction</span></label>
+    <select id="set-direction">
+      <option value="in">Zoom in</option>
+      <option value="out">Zoom out</option>
+      <option value="alternate">Alternate</option>
+    </select>
+    <div class="note">Zoom out: each photo shrinks into a tile of the next. Applies from the next photo.</div>
+  </div>
+  <div class="row">
     <label for="set-grid"><span>Grid size</span><span id="val-grid"></span></label>
     <input id="set-grid" type="range">
     <div class="note">More tiles = clearer mosaic and a softer reveal (tiles start smaller). Leopard’s default was 60.</div>
@@ -124,9 +136,9 @@
 
 <div id="toast"></div>
 
-<script src="js/core.js?v=0.3.0"></script>
-<script src="js/library.js?v=0.3.0"></script>
-<script src="js/player.js?v=0.3.0"></script>
-<script src="js/app.js?v=0.3.0"></script>
+<script src="js/core.js?v=0.4.0"></script>
+<script src="js/library.js?v=0.4.0"></script>
+<script src="js/player.js?v=0.4.0"></script>
+<script src="js/app.js?v=0.4.0"></script>
 </body>
 </html>

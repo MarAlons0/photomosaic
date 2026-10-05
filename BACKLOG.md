@@ -13,12 +13,12 @@ _Last updated: 2026-10-05_
   - likely photo source: the Mac's `library/` served over the home network; check whether tvOS apps can read iCloud Photos at all
 
 ## 🟢 Low / Nice to have
-- [ ] **Zoom-out mode** — reverse direction (photo shrinks into a tile of a bigger mosaic). `[idea]`
 - [ ] **Photo caption** — optionally show the location/date of the photo filling the screen. `[feature]`
 - [ ] **Native `.saver` bundle** — Swift/ScreenSaver.framework port for smoother playback. `[idea]`
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Zoom-out mode** — plus Alternate — v0.4.0
 - [x] **Rotating tile pool** — v0.3.0
 - [x] **Lazy-load tile images** — v0.3.0
 - [x] **Try it with a real Photos export** — 618 photos, defaults tuned — v0.2.0

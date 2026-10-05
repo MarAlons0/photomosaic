@@ -4,6 +4,14 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.4.0] – 2026-10-05
+### Added
+- **Zoom-out mode**: each photo shrinks into a tile of the next photo's mosaic, which then resolves into that photo — the reverse of the original dive. **Alternate** switches direction every cycle. Set it in the settings panel (*Direction*) or with `?direction=in|out|alternate`.
+- The outgoing photo is placed in the central cell whose colours best suit it, so it blends into the new mosaic; tiles that appear large when zooming out are pre-loaded during the pause.
+
+### Changed
+- The photo for the next mosaic is chosen (and pre-loaded) a cycle ahead.
+
 ## [0.3.0] – 2026-10-05
 ### Added
 - **Big-library support** (tested with 6,500 photos): each mosaic is built from the next 1,500 photos of a shuffled deck (**rotating pool**), so build time stays bounded (~0.3 s at 150 × 150) and every photo comes round.
