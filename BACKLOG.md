@@ -2,9 +2,6 @@
 _Last updated: 2026-10-05_
 
 ## 🔴 High
-- [ ] **Rotating tile pool** — each cycle draws its tiles from a fresh random subset (~1,500) of the library, so large libraries (e.g. a 6,500-photo shared album) stay fast and every photo eventually appears. `[feature]`
-  - replaces the fixed `--limit` sample in `build_library.py` as the way to handle big libraries
-- [ ] **Lazy-load tile images** — keep only tiny thumbnails in memory and load the 320 px versions when tiles get large on screen, capping memory at a few hundred MB regardless of library size. `[feature]`
 - [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. `[chore]`
 
 ## 🟡 Medium
@@ -22,6 +19,8 @@ _Last updated: 2026-10-05_
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Rotating tile pool** — v0.3.0
+- [x] **Lazy-load tile images** — v0.3.0
 - [x] **Try it with a real Photos export** — 618 photos, defaults tuned — v0.2.0
 - [x] **Softer reveal + finer grids** — tile-size-based crossfade, grids up to 200 — v0.2.0
 - [x] **Recursive mosaic zoom player** — v0.1.0

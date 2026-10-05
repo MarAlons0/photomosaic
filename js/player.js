@@ -10,14 +10,22 @@
  * The fixed point f satisfies f + N*(t - f) = 0, i.e. f = N*t / (N - 1),
  * giving screen = f + s*(world - f) for s from 1 to N. Scale is interpolated
  * in log space so the zoom feels constant-speed.
+ *
+ * Scaling to big libraries:
+ *   - Rotating pool: each mosaic is built from POOL_SIZE photos dealt from a
+ *     shuffled deck, so match cost is bounded and every photo comes round.
+ *   - Lazy levels: only each photo's 64 px micro is resident. Larger versions
+ *     are requested as tiles grow on screen and kept in per-size LRU caches.
  */
 (function (PM) {
   'use strict';
 
-  const HIRES_CACHE = 24;
+  const POOL_SIZE = 1500;
   const RECENT = 12;
   const TEX_MAX = 4096;      // max side of the pre-rendered mosaic texture
   const REVEAL_END = 40;     // CSS px tile width by which the mosaic is fully revealed
+  const CAPS = { tiny: 3000, mid: 800, hires: 14 };  // cached versions per size
+  const CONCURRENCY = 6;
 
   const clamp01 = t => Math.min(1, Math.max(0, t));
   const smooth = t => t * t * (3 - 2 * t);
@@ -39,10 +47,20 @@
     return lerp(1, tint, reveal) * handoff;
   }
 
-  // Smallest version of a photo that is sharp enough to draw w px wide.
+  // Smallest loaded version of a photo that is sharp enough to draw w px wide.
   function pickLevel(levels, w) {
     for (const l of levels) if (l.crop[2] >= w * 0.85) return l;
     return levels[levels.length - 1];
+  }
+
+  function shuffled(n) {
+    const a = new Int32Array(n);
+    for (let i = 0; i < n; i++) a[i] = i;
+    for (let i = n - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
   }
 
   PM.Player = class {
@@ -51,9 +69,15 @@
       this.ctx = canvas.getContext('2d', { alpha: false });
       this.photos = photos;
       this.settings = settings;
-      this.hires = new Map();      // photo index -> { promise, level }
+      this.cache = { tiny: new Map(), mid: new Map(), hires: new Map() };  // photo index -> entry
+      this.qHigh = [];
+      this.qLow = [];
+      this.active = 0;
+      this.warm = [];              // freshly loaded full-size images to pre-upload
       this.pinned = new Set();
       this.recent = [];
+      this.deck = null;
+      this.deckPos = 0;
       this.paused = false;
       this.elapsed = 0;
       this.cycle = null;
@@ -72,16 +96,21 @@
       this.canvas.width = this.W;
       this.canvas.height = this.H;
       this.aspect = this.W / this.H;
+      // Tile widths (device px) at which a sharper version is worth loading. Tied to
+      // screen width so the number of tiles on screen at that moment stays bounded.
+      this.tinyAt = Math.max(56, this.W / 50);
+      this.midAt = Math.max(110, this.W / 22);
       for (const p of this.photos) {
         for (const l of p.levels) l.crop = PM.cover(l.w, l.h, this.aspect);
-        const [aw, ah] = PM.dims(p.analysis);
-        p.feat = PM.gridFeatures(p.analysis, PM.cover(aw, ah, this.aspect), 1, 8);
+        const [mw, mh] = PM.dims(p.micro);
+        p.feat = PM.gridFeatures(p.micro, PM.cover(mw, mh, this.aspect), 1, 8);
       }
     }
 
     async start(first) {
       const a = first == null ? (Math.random() * this.photos.length) | 0 : first;
-      await this.ensureHires(a).catch(() => {});
+      this.pinned = new Set([a]);
+      await Promise.all([this.request(a, 'hires', true), this.request(a, 'tiny', true)]);
       this.startCycle(a);
       if (!this.running) {
         this.running = true;
@@ -97,62 +126,99 @@
 
     next() { if (this.cycle) this.startCycle(this.cycle.b); }
 
-    /* ---------- hi-res images, loaded on demand ---------- */
+    /* ---------- on-demand image versions ---------- */
 
-    ensureHires(i) {
-      const hit = this.hires.get(i);
+    // Load (or touch, if already cached) one size of photo i. Never rejects.
+    request(i, kind, high = false) {
+      const m = this.cache[kind];
+      const hit = m.get(i);
       if (hit) {
-        this.hires.delete(i);
-        this.hires.set(i, hit);
+        m.delete(i);
+        m.set(i, hit);
         return hit.promise;
       }
       const p = this.photos[i];
-      const entry = { level: null };
-      entry.promise = p.loadHires(this.W, this.H).then(({ src, tainted }) => {
-        const [w, h] = PM.dims(src);
-        entry.level = { src, w, h, crop: PM.cover(w, h, this.aspect), tainted, hires: true };
-        if (this.hires.get(i) === entry) {
-          p.levels = p.levels.filter(l => !l.hires).concat(entry.level);
-        } else if (src.close) {
-          src.close();
-        }
+      const entry = { level: null, failed: false };
+      entry.promise = new Promise(resolve => {
+        const run = async () => {
+          try {
+            const { src, tainted } = await p.load[kind](this.W, this.H);
+            if (m.get(i) !== entry) { PM.release(src); return; }  // evicted while loading
+            const [w, h] = PM.dims(src);
+            entry.level = { src, w, h, kind, tainted, crop: PM.cover(w, h, this.aspect) };
+            p.levels = p.levels.filter(l => l.kind !== kind).concat(entry.level)
+              .sort((x, y) => x.crop[2] - y.crop[2]);
+            if (kind === 'hires') this.warm.push(src);
+          } catch (e) {
+            entry.failed = true;  // stays cached so we don't retry every frame
+            console.warn(e);
+          } finally {
+            resolve();
+          }
+        };
+        (high ? this.qHigh : this.qLow).push(run);
       });
-      this.hires.set(i, entry);
-      this._evict();
+      m.set(i, entry);
+      this._evict(kind);
+      this._pump();
       return entry.promise;
     }
 
-    _evict() {
-      for (const [i, entry] of this.hires) {
-        if (this.hires.size <= HIRES_CACHE) break;
+    _pump() {
+      while (this.active < CONCURRENCY) {
+        // High priority first (next photo, analysis); otherwise newest request first,
+        // since it's the most likely to still be on screen.
+        const run = this.qHigh.shift() || this.qLow.pop();
+        if (!run) return;
+        this.active++;
+        run().then(() => { this.active--; this._pump(); });
+      }
+    }
+
+    _evict(kind) {
+      const m = this.cache[kind];
+      for (const [i, entry] of m) {
+        if (m.size <= CAPS[kind]) break;
         if (this.pinned.has(i)) continue;
-        this.hires.delete(i);
-        const p = this.photos[i];
-        p.levels = p.levels.filter(l => !l.hires);
-        if (entry.level && entry.level.src.close) entry.level.src.close();
+        m.delete(i);
+        if (entry.level) {
+          const p = this.photos[i];
+          p.levels = p.levels.filter(l => l !== entry.level);
+          PM.release(entry.level.src);
+        }
       }
     }
 
     /* ---------- cycles ---------- */
+
+    // The next POOL_SIZE photos from a shuffled deck (reshuffled when used up).
+    drawPool(a) {
+      const n = this.photos.length;
+      if (n - 1 <= POOL_SIZE) {
+        const all = [];
+        for (let i = 0; i < n; i++) if (i !== a || n === 1) all.push(i);
+        return all;
+      }
+      const picked = new Set();
+      while (picked.size < POOL_SIZE) {
+        if (!this.deck || this.deckPos >= n) { this.deck = shuffled(n); this.deckPos = 0; }
+        const i = this.deck[this.deckPos++];
+        if (i !== a) picked.add(i);
+      }
+      return [...picked];
+    }
 
     startCycle(a) {
       const { photos, W, H } = this;
       const N = this.settings.grid;
       const A = photos[a];
 
-      // Analyse A from the sharpest version we're allowed to read pixels from.
-      const readable = A.levels.filter(l => l.hires && !l.tainted).pop();
-      let cells;
-      if (readable) {
-        cells = PM.gridFeatures(readable.src, readable.crop, N, 2);
-      } else {
-        const [aw, ah] = PM.dims(A.analysis);
-        cells = PM.gridFeatures(A.analysis, PM.cover(aw, ah, this.aspect), N, 2);
-      }
+      // Analyse A from the sharpest version we're allowed to read pixels from
+      // (micro is always readable, so this never comes up empty).
+      const readable = A.levels.filter(l => !l.tainted).pop();
+      const cells = PM.gridFeatures(readable.src, readable.crop, N, 2);
 
-      let pool = photos.map((_, i) => i);
-      if (pool.length > 1) pool = pool.filter(i => i !== a);
-      const assign = PM.buildMosaic(cells, N, pool, photos.map(p => p.feat), {
+      const assign = PM.buildMosaic(cells, N, this.drawPool(a), photos.map(p => p.feat), {
         spacing: this.settings.spacing,
         penalty: 60,
       });
@@ -179,17 +245,18 @@
       this.elapsed = 0;
       this.buildTexture();
 
-      // Hi-res for B (fills the screen at the end) and the tiles around it.
-      this.pinned = new Set([a, b]);
+      // Keep A; fetch B (fills the screen at the end, analysed next cycle) and the
+      // tiles around it at full size.
       const near = [];
       for (let r = row - 1; r <= row + 1; r++) {
         for (let c = col - 1; c <= col + 1; c++) {
           if (r >= 0 && c >= 0 && r < N && c < N) near.push(assign[r * N + c]);
         }
       }
-      near.forEach(i => this.pinned.add(i));
-      this.ensureHires(b).catch(e => console.warn(e));
-      near.forEach(i => this.ensureHires(i).catch(e => console.warn(e)));
+      this.pinned = new Set([a, b, ...near]);
+      this.request(b, 'hires', true);
+      this.request(b, 'tiny', true);
+      near.forEach(i => this.request(i, 'hires', true));
     }
 
     /*
@@ -252,6 +319,12 @@
       const vx0 = Math.max(0, wx0), vx1 = Math.min(W, wx1);
       const vy0 = Math.max(0, wy0), vy1 = Math.min(H, wy1);
 
+      // Draw one newly loaded full-size image into a corner (immediately painted over)
+      // so the browser uploads it to the GPU now rather than mid-zoom, where a few
+      // first draws at once would drop frames.
+      const warm = this.warm.shift();
+      if (warm) try { ctx.drawImage(warm, 0, 0, 1, 1); } catch (e) { /* evicted and closed meanwhile */ }
+
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
@@ -266,6 +339,8 @@
           X(vx0), Y(vy0), (vx1 - vx0) * s, (vy1 - vy0) * s
         );
       } else if (alpha < 1) {
+        // Sharper version worth having at this tile size (micro needs no request).
+        const want = tile > this.midAt ? 'mid' : tile > this.tinyAt ? 'tiny' : null;
         const cw = W / N, ch = H / N;
         const c0 = Math.max(0, Math.floor(wx0 / cw)), c1 = Math.min(N - 1, Math.ceil(wx1 / cw) - 1);
         const r0 = Math.max(0, Math.floor(wy0 / ch)), r1 = Math.min(N - 1, Math.ceil(wy1 / ch) - 1);
@@ -275,9 +350,11 @@
           for (let c = c0; c <= c1; c++) {
             const x0 = Math.round(X(c * cw)), x1 = Math.round(X((c + 1) * cw));
             const tw = x1 - x0;
-            const l = pickLevel(photos[assign[r * N + c]].levels, tw);
+            const idx = assign[r * N + c];
+            const l = pickLevel(photos[idx].levels, tw);
             const k = l.crop;
             ctx.drawImage(l.src, k[0], k[1], k[2], k[3], x0, y0, tw, y1 - y0);
+            if (want) this.request(idx, want);
           }
         }
       }

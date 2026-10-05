@@ -3,10 +3,19 @@
  *
  *   {
  *     name,
- *     analysis,            untainted image used for colour analysis (getImageData-safe)
- *     levels: [{src, w, h, crop}]   drawable versions, smallest first (crop set by the player)
- *     loadHires(W, H) -> Promise<{src, tainted}>   a version big enough to fill a W x H screen
+ *     micro,     64 px canvas, always in memory: tile features, far-zoom drawing, fallback
+ *     levels,    loaded versions [{src, w, h, crop, kind, tainted}], smallest first;
+ *                starts as [micro] and is managed by the player's cache
+ *     load: {    on-demand versions, each -> Promise<{src, tainted}>
+ *       tiny(),        ~128 px
+ *       mid(),         ~320 px
+ *       hires(W, H),   big enough to fill a W x H screen
+ *     }
  *   }
+ *
+ * Only `micro` is kept for every photo, so memory stays bounded however big the
+ * library is. `tainted` marks images whose pixels the browser won't let us read
+ * (file:// images other than data: URIs); those can be drawn but not analysed.
  *
  * Three sources:
  *   fromFiles     - photos picked or dropped in the browser (File objects)
@@ -16,9 +25,10 @@
 (function (PM) {
   'use strict';
 
-  const MID = 320;    // long edge of the per-photo tile image
-  const MICRO = 64;   // long edge of the tiny version drawn when tiles are a few px wide
-  const MAX_PHOTOS = 2000;
+  const MID = 320;    // long edge of the tile image
+  const TINY = 128;   // long edge of the small tile image
+  const MICRO = 64;   // long edge of the always-loaded version
+  const MAX_PHOTOS = 10000;
 
   const IMAGE_RE = /\.(jpe?g|png|webp|heic|heif|avif|gif|bmp|tiff?)$/i;
 
@@ -68,7 +78,8 @@
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.decoding = 'async';
-      img.onload = () => resolve(img);
+      // Decode off the main thread now, so the first drawImage doesn't stall a frame.
+      img.onload = () => (img.decode ? img.decode() : Promise.resolve()).then(() => resolve(img), () => resolve(img));
       img.onerror = () => reject(new Error('Could not load ' + url.slice(0, 80)));
       img.src = url;
     });
@@ -84,12 +95,22 @@
     }
   }
 
-  function release(src) { if (src && src.close) src.close(); }
+  PM.release = src => { if (src && src.close) src.close(); };
 
   async function coverSize(src, W, H) {
     const [w, h] = PM.dims(src);
     const s = Math.max(W / w, H / h);
     return s >= 1 ? src : resize(src, w * s, h * s);
+  }
+
+  function toJpeg(src) {
+    let c = src;
+    if (!(src instanceof HTMLCanvasElement)) {
+      const [w, h] = PM.dims(src);
+      c = canvasOf(w, h);
+      c.getContext('2d').drawImage(src, 0, 0);
+    }
+    return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.85));
   }
 
   // Run fn over items with limited concurrency, reporting progress.
@@ -100,20 +121,20 @@
         const i = next++;
         try { await fn(items[i], i); } catch (e) { console.warn(e); }
         done++;
-        if (onProgress) onProgress(done, items.length);
+        if (onProgress && (done % 10 === 0 || done === items.length)) onProgress(done, items.length);
       }
     };
     await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   }
 
-  function level(src) {
-    const [w, h] = PM.dims(src);
-    return { src, w, h, crop: [0, 0, w, h] };
-  }
-
   async function microOf(src) {
     const [w, h] = fitLong(src, MICRO);
     return stepDown(src, w, h);
+  }
+
+  function makePhoto(name, micro, load) {
+    const [w, h] = PM.dims(micro);
+    return { name, micro, levels: [{ src: micro, w, h, crop: [0, 0, w, h], kind: 'micro', tainted: false }], load };
   }
 
   function sample(arr, max) {
@@ -126,9 +147,12 @@
     return a.slice(0, max);
   }
 
+  const clean = src => ({ src, tainted: false });
+
   PM.Library = {
     isImageFile(f) { return /^image\//.test(f.type) || IMAGE_RE.test(f.name); },
 
+    // Decodes each photo once, keeping a 64 px canvas plus a compressed 320 px JPEG.
     async fromFiles(fileList, onProgress) {
       const files = sample([...fileList].filter(PM.Library.isImageFile), MAX_PHOTOS);
       const photos = [];
@@ -136,59 +160,71 @@
         const full = await decodeFile(file);
         const [w, h] = fitLong(full, MID);
         const mid = await resize(full, w, h);
-        release(full);
-        photos.push({
-          name: file.name,
-          analysis: mid,
-          levels: [level(await microOf(mid)), level(mid)],
-          async loadHires(W, H) {
+        if (mid !== full) PM.release(full);
+        const [micro, blob] = await Promise.all([microOf(mid), toJpeg(mid)]);
+        PM.release(mid);
+        photos.push(makePhoto(file.name, micro, {
+          async tiny() {
+            const bmp = await createImageBitmap(blob);
+            const [tw, th] = fitLong(bmp, TINY);
+            const t = await resize(bmp, tw, th);
+            if (t !== bmp) PM.release(bmp);
+            return clean(t);
+          },
+          async mid() { return clean(await createImageBitmap(blob)); },
+          async hires(W, H) {
             const big = await decodeFile(file);
             const src = await coverSize(big, W, H);
-            if (src !== big) release(big);
-            return { src, tainted: false };
+            if (src !== big) PM.release(big);
+            return clean(src);
           },
-        });
+        }));
       }, onProgress);
       return photos;
     },
 
     async fromManifest(manifest, onProgress) {
       const base = manifest.base || 'library/';
+      const fromDisk = location.protocol === 'file:';
       const photos = [];
       await pool(manifest.photos, 8, async e => {
-        const tiny = await loadImg(e.t);         // data: URI, so safe to read pixels from
-        const levels = [level(await microOf(tiny)), level(tiny)];
-        try { levels.push(level(await loadImg(base + e.m))); } catch (err) { console.warn(err); }
-        photos.push({
-          name: e.n,
-          analysis: tiny,
-          levels,
-          async loadHires() {
-            return { src: await loadImg(base + e.f), tainted: location.protocol === 'file:' };
+        const micro = await microOf(await loadImg(e.t));  // data: URI, so safe to read pixels from
+        photos.push(makePhoto(e.n, micro, {
+          async tiny() { return clean(await loadImg(e.t)); },
+          async mid() { return { src: await loadImg(base + e.m), tainted: fromDisk }; },
+          async hires() {
+            // An ImageBitmap keeps its decoded pixels; an <img> may be re-decoded on
+            // first draw, which stalls the zoom for tens of ms at full size.
+            const img = await loadImg(base + e.f);
+            let src = img;
+            try { src = await createImageBitmap(img); } catch (err) { /* keep the <img> */ }
+            return { src, tainted: fromDisk };
           },
-        });
+        }));
       }, onProgress);
       return photos;
     },
 
+    // Scenes are vector-painted, so every size is rendered fresh on demand.
     async demo(count, onProgress) {
       const photos = [];
       const SW = 600, SH = 400;
+      const render = (seed, w, h) => {
+        const c = canvasOf(w, h);
+        PM.drawScene(c.getContext('2d'), c.width, c.height, seed);
+        return c;
+      };
       for (let i = 0; i < count; i++) {
         const seed = i + 1;
-        const mid = canvasOf(MID, MID * SH / SW);
-        PM.drawScene(mid.getContext('2d'), mid.width, mid.height, seed);
-        photos.push({
-          name: 'Demo scene ' + seed,
-          analysis: mid,
-          levels: [level(await microOf(mid)), level(mid)],
-          async loadHires(W, H) {
+        const at = long => render(seed, long, (long * SH) / SW);
+        photos.push(makePhoto('Demo scene ' + seed, await microOf(at(MID)), {
+          async tiny() { return clean(at(TINY)); },
+          async mid() { return clean(at(MID)); },
+          async hires(W, H) {
             const s = Math.max(W / SW, H / SH);
-            const c = canvasOf(SW * s, SH * s);
-            PM.drawScene(c.getContext('2d'), c.width, c.height, seed);
-            return { src: c, tainted: false };
+            return clean(render(seed, SW * s, SH * s));
           },
-        });
+        }));
         if (i % 20 === 19) { onProgress(i + 1, count); await new Promise(r => setTimeout(r)); }
       }
       return photos;

@@ -18,7 +18,8 @@ longer in the source folder are dropped from the manifest (and deleted with --pr
 
 Usage:
     python3 tools/build_library.py ~/Pictures/MosaicExport
-    python3 tools/build_library.py ~/Pictures/MosaicExport --limit 800 --prune
+    python3 tools/build_library.py ~/Pictures/NatureExport --out library-nature --prune
+        (then open index.html?lib=library-nature)
 
 Requires Pillow (pip install Pillow). HEIC needs pillow-heif (pip install pillow-heif),
 or export JPEGs from Photos instead.
@@ -102,8 +103,9 @@ def main():
     ap.add_argument("source", help="folder of photos (searched recursively)")
     ap.add_argument("--out", default=os.path.join(ROOT, "library"),
                     help="output folder (default: library/ next to index.html)")
-    ap.add_argument("--limit", type=int, default=1500,
-                    help="max photos; a random sample is taken if there are more (default 1500)")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="max photos; a random sample is taken if there are more (default: no limit — "
+                         "the player rotates through big libraries by itself)")
     ap.add_argument("--full", type=int, default=2880, help="long edge of full-size images (default 2880)")
     ap.add_argument("--mid", type=int, default=320, help="long edge of tile images (default 320)")
     ap.add_argument("--tiny", type=int, default=128, help="long edge of inline thumbnails (default 128)")
@@ -121,7 +123,7 @@ def main():
     paths = find_photos(src)
     if not paths:
         sys.exit(f"No photos found in {src}" + ("" if HEIF else " (HEIC needs: pip3 install pillow-heif)"))
-    if len(paths) > args.limit:
+    if args.limit and len(paths) > args.limit:
         random.seed(0)  # stable sample between runs
         paths = sorted(random.sample(paths, args.limit))
     print(f"{len(paths)} photos in {src}")
@@ -187,8 +189,10 @@ def main():
 
     size = os.path.getsize(os.path.join(out, "manifest.js")) / 1e6
     print(f"Wrote {len(photos)} photos to {out}/manifest.js ({size:.1f} MB)")
-    if rel != "library":
-        print("Note: index.html loads library/manifest.js — copy or symlink this folder there.")
+    if rel.startswith(".."):
+        print("Note: the player only finds libraries inside the Photomosaic folder.")
+    elif rel != "library":
+        print(f"Open it with: index.html?lib={rel}")
 
 
 if __name__ == "__main__":

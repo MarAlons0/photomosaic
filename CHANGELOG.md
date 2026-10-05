@@ -4,6 +4,19 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.3.0] – 2026-10-05
+### Added
+- **Big-library support** (tested with 6,500 photos): each mosaic is built from the next 1,500 photos of a shuffled deck (**rotating pool**), so build time stays bounded (~0.3 s at 150 × 150) and every photo comes round.
+- **Lazy loading**: only a 64 px version of each photo stays in memory; 128 px, 320 px and full-size versions load as tiles grow on screen, held in size-limited LRU caches.
+- **`?lib=<folder>`** picks a library built with `build_library.py --out <folder>`, so several libraries (e.g. a shared album) can live side by side.
+
+### Changed
+- `build_library.py` no longer caps libraries at 1,500 photos by default (`--limit` is still available).
+- Script URLs carry the version (`?v=`), so browsers pick up new releases instead of running cached code.
+
+### Fixed
+- Dropped frames when full-size photos first appear late in the zoom: they're now decoded up front (`ImageBitmap`) and pre-uploaded to the GPU.
+
 ## [0.2.0] – 2026-10-05
 ### Changed
 - **Softer photo → mosaic reveal**: the crossfade now follows on-screen tile size instead of time, dissolving the photo while tiles grow from their starting size to ~40 px — so the mosaic emerges from barely-visible specks rather than popping in.

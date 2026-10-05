@@ -37,10 +37,30 @@ pre-build a library once:
    ```
 
    This writes `library/` next to `index.html` (ignored by git). Re-running is incremental; add
-   `--prune` to delete photos you removed from the export folder, `--limit 800` to cap the count.
+   `--prune` to delete photos you removed from the export folder.
 3. Open `index.html` — it starts automatically with the library.
 
 HEIC exports need `pip3 install pillow-heif`; exporting as JPEG avoids that.
+
+### Several libraries
+
+Build each into its own folder and pick one with `?lib=`:
+
+```bash
+python3 tools/build_library.py ~/Pictures/NatureExport --out library-nature
+```
+
+then open `index.html?lib=library-nature` (combine with other parameters, e.g. `?lib=library-nature&saver=1`).
+
+### Big libraries and shared albums
+
+There's no photo limit: thousands of photos are fine (tested with 6,500). Each mosaic is built from
+the next 1,500 photos of a shuffled deck, so every photo gets its turn, and only a 64 px version of
+each photo stays in memory — larger versions load as their tiles grow on screen.
+
+**iCloud shared albums** export the same way: in Photos open *Shared Albums → (album)*, select all,
+*File → Export*. Photos may need to download them first. Shared-album photos are stored at about
+2048 px, so the final full-screen photo is slightly soft on a Retina display.
 
 ## As a screen saver (macOS)
 
@@ -76,9 +96,12 @@ file:///Users/<you>/Documents/Claude-code-projects/Photomosaic/index.html?saver=
   the next photo — the next cycle starts from the identical frame.
 - **Colour blend.** The big photo is faded over its own mosaic (fully at first, then faintly) — the
   classic photomosaic trick that makes the large image read clearly.
-- **Level of detail.** Each photo exists at ~64 px, ~320 px, and full screen size; the renderer
-  picks the smallest that is sharp enough for each tile's on-screen size. Full-size images load
-  only for the next photo and its neighbours.
+- **Level of detail.** Each photo exists at ~64 px (always loaded), ~128 px, ~320 px and full screen
+  size; the renderer picks the smallest that is sharp enough for each tile's on-screen size and loads
+  bigger versions on demand into size-limited caches. While tiles are tiny, the whole mosaic is drawn
+  from one pre-rendered texture. Full-size images load only for the next photo and its neighbours.
+- **Rotating pool.** Mosaics are matched against at most 1,500 photos, dealt from a shuffled deck, so
+  build time stays well under a second however large the library is.
 
 ## Files
 

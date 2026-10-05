@@ -5,11 +5,12 @@
  *   ?grid=60&duration=22&hold=3&tint=0.2&spacing=3   override settings
  *   ?demo=1      start straight away with demo scenes
  *   ?saver=1     never show the intro; use the built library, else the demo
+ *   ?lib=NAME    use the library built into folder NAME (default: library)
  */
 (function (PM) {
   'use strict';
 
-  PM.VERSION = '0.2.0'; // keep in sync with VERSION
+  PM.VERSION = '0.3.0'; // keep in sync with VERSION and the ?v= on index.html's script tags
 
   const DEFAULTS = { grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
   const RANGES = {
@@ -83,13 +84,17 @@
   $('#files-input').onchange = e => e.target.files.length && useFiles([...e.target.files]);
   $('#use-demo').onclick = useDemo;
 
-  const manifestOk = window.PHOTO_MANIFEST && Array.isArray(window.PHOTO_MANIFEST.photos);
-  if (manifestOk) {
-    const b = $('#use-library');
-    b.hidden = false;
-    b.textContent = `Use built library (${window.PHOTO_MANIFEST.photos.length} photos)`;
-    b.onclick = useManifest;
+  // Load <lib>/manifest.js as a script (works from file://, unlike fetch). A missing
+  // file just means no built library.
+  function loadManifest(lib) {
+    return new Promise(resolve => {
+      const el = document.createElement('script');
+      el.src = lib + '/manifest.js';
+      el.onload = el.onerror = () => resolve(window.PHOTO_MANIFEST && Array.isArray(window.PHOTO_MANIFEST.photos));
+      document.head.appendChild(el);
+    });
   }
+  const lib = /^[\w-]+(\/[\w-]+)*$/.test(params.get('lib') || '') ? params.get('lib') : 'library';
 
   // Drag & drop of files and folders.
   async function walk(entry, out) {
@@ -201,7 +206,15 @@
 
   /* ---------- autostart ---------- */
 
-  if (params.get('demo') === '1') useDemo();
-  else if (params.get('saver') === '1') manifestOk ? useManifest() : useDemo();
-  else if (manifestOk) useManifest();
+  loadManifest(lib).then(manifestOk => {
+    if (manifestOk) {
+      const b = $('#use-library');
+      b.hidden = false;
+      b.textContent = `Use built library (${window.PHOTO_MANIFEST.photos.length} photos)`;
+      b.onclick = useManifest;
+    }
+    if (params.get('demo') === '1') useDemo();
+    else if (params.get('saver') === '1') manifestOk ? useManifest() : useDemo();
+    else if (manifestOk) useManifest();
+  });
 })(window.PM);
