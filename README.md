@@ -20,7 +20,7 @@ No build step, no server, no dependencies in the browser. Plain HTML + JavaScrip
 | `S` | settings panel |
 
 Settings (grid size, zoom speed, pause per photo, colour blend, repeat spacing) are remembered in the
-browser and can also be set by URL: `index.html?grid=80&duration=30&hold=4&tint=0.15&spacing=3`.
+browser and can also be set by URL: `index.html?grid=150&duration=30&hold=4&tint=0.15&spacing=3`.
 
 ## Using your Photos library
 

@@ -17,6 +17,7 @@ _Last updated: 2026-10-05_
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Softer reveal + finer grids** — tile-size-based crossfade, grids up to 200 — v0.2.0
 - [x] **Recursive mosaic zoom player** — v0.1.0
 - [x] **Photomosaic matcher** — v0.1.0
 - [x] **Library builder script** — v0.1.0

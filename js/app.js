@@ -9,11 +9,11 @@
 (function (PM) {
   'use strict';
 
-  PM.VERSION = '0.1.0'; // keep in sync with VERSION
+  PM.VERSION = '0.2.0'; // keep in sync with VERSION
 
-  const DEFAULTS = { grid: 60, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
+  const DEFAULTS = { grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
   const RANGES = {
-    grid: [10, 120, 5],
+    grid: [20, 200, 10],
     duration: [6, 90, 1],
     hold: [0, 15, 0.5],
     tint: [0, 0.6, 0.05],

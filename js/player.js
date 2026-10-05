@@ -16,19 +16,33 @@
 
   const HIRES_CACHE = 24;
   const RECENT = 12;
+  const TEX_MAX = 4096;      // max side of the pre-rendered mosaic texture
+  const REVEAL_END = 40;     // CSS px tile width by which the mosaic is fully revealed
 
+  const clamp01 = t => Math.min(1, Math.max(0, t));
   const smooth = t => t * t * (3 - 2 * t);
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeInOut = u => (1 - Math.cos(Math.PI * u)) / 2;
 
-  // How strongly photo A is laid over its own mosaic at zoom progress p.
-  // 1 = only the photo; fades to the "tint" cheat, then to 0 as tile B takes over.
-  function overlayAlpha(p, tint) {
-    if (p < 0.06) return 1;
-    if (p < 0.4) return lerp(1, tint, smooth((p - 0.06) / 0.34));
-    if (p < 0.72) return tint;
-    if (p < 0.94) return lerp(tint, 0, smooth((p - 0.72) / 0.22));
-    return 0;
+  /*
+   * How strongly photo A is laid over its own mosaic.
+   * The reveal follows on-screen tile size (log scale), not time: the photo
+   * dissolves while tiles grow from their starting size to REVEAL_END px, so
+   * with a fine grid the mosaic emerges from barely-visible specks. It settles
+   * at the "tint" cheat, then fades to 0 as tile B takes over the screen.
+   */
+  function overlayAlpha(p, tileCss, tileCss0, tint) {
+    const a0 = Math.log(Math.max(tileCss0, 2));
+    const a1 = Math.log(Math.max(tileCss0 * 3, REVEAL_END));
+    const reveal = smooth(clamp01((Math.log(tileCss) - a0) / (a1 - a0)));
+    const handoff = 1 - smooth(clamp01((p - 0.72) / 0.22));
+    return lerp(1, tint, reveal) * handoff;
+  }
+
+  // Smallest version of a photo that is sharp enough to draw w px wide.
+  function pickLevel(levels, w) {
+    for (const l of levels) if (l.crop[2] >= w * 0.85) return l;
+    return levels[levels.length - 1];
   }
 
   PM.Player = class {
@@ -52,6 +66,7 @@
 
     resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.dpr = dpr;
       this.W = Math.round(window.innerWidth * dpr);
       this.H = Math.round(window.innerHeight * dpr);
       this.canvas.width = this.W;
@@ -162,6 +177,7 @@
 
       this.cycle = { a, b, N, assign, cell, tx: (col * W) / N, ty: (row * H) / N };
       this.elapsed = 0;
+      this.buildTexture();
 
       // Hi-res for B (fills the screen at the end) and the tiles around it.
       this.pinned = new Set([a, b]);
@@ -174,6 +190,31 @@
       near.forEach(i => this.pinned.add(i));
       this.ensureHires(b).catch(e => console.warn(e));
       near.forEach(i => this.ensureHires(i).catch(e => console.warn(e)));
+    }
+
+    /*
+     * Pre-render the whole mosaic into one canvas. While tiles are small on
+     * screen, one drawImage of this texture replaces thousands of per-tile
+     * draws, which is what makes fine grids (small starting tiles) affordable.
+     */
+    buildTexture() {
+      const { N, assign } = this.cycle;
+      const tw = Math.max(2, Math.floor(Math.min(48, TEX_MAX / N, (TEX_MAX * this.aspect) / N)));
+      const th = Math.max(2, Math.round(tw / this.aspect));
+      if (!this.tex) this.tex = document.createElement('canvas');
+      this.tex.width = N * tw;
+      this.tex.height = N * th;
+      const g = this.tex.getContext('2d', { alpha: false });
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          const l = pickLevel(this.photos[assign[r * N + c]].levels, tw);
+          const k = l.crop;
+          g.drawImage(l.src, k[0], k[1], k[2], k[3], c * tw, r * th, tw, th);
+        }
+      }
+      this.texTile = tw;
     }
 
     /* ---------- animation ---------- */
@@ -202,18 +243,29 @@
       const fx = (N * tx) / (N - 1), fy = (N * ty) / (N - 1);
       const X = wx => fx + s * (wx - fx);
       const Y = wy => fy + s * (wy - fy);
-      const alpha = overlayAlpha(p, this.settings.tint);
+      const tile = (W / N) * s; // on-screen tile width, device px
+      const alpha = overlayAlpha(p, tile / this.dpr, W / N / this.dpr, this.settings.tint);
 
-      // World-space rectangle currently on screen.
+      // World-space rectangle currently on screen, and its part inside the mosaic.
       const wx0 = fx - fx / s, wx1 = fx + (W - fx) / s;
       const wy0 = fy - fy / s, wy1 = fy + (H - fy) / s;
+      const vx0 = Math.max(0, wx0), vx1 = Math.min(W, wx1);
+      const vy0 = Math.max(0, wy0), vy1 = Math.min(H, wy1);
 
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'medium';
 
-      if (alpha < 1) {
+      if (alpha < 1 && tile <= this.texTile * 1.25) {
+        // Small tiles: draw the visible part of the pre-rendered mosaic in one go.
+        const tex = this.tex, kx = tex.width / W, ky = tex.height / H;
+        ctx.drawImage(
+          tex,
+          vx0 * kx, vy0 * ky, (vx1 - vx0) * kx, (vy1 - vy0) * ky,
+          X(vx0), Y(vy0), (vx1 - vx0) * s, (vy1 - vy0) * s
+        );
+      } else if (alpha < 1) {
         const cw = W / N, ch = H / N;
         const c0 = Math.max(0, Math.floor(wx0 / cw)), c1 = Math.min(N - 1, Math.ceil(wx1 / cw) - 1);
         const r0 = Math.max(0, Math.floor(wy0 / ch)), r1 = Math.min(N - 1, Math.ceil(wy1 / ch) - 1);
@@ -223,9 +275,7 @@
           for (let c = c0; c <= c1; c++) {
             const x0 = Math.round(X(c * cw)), x1 = Math.round(X((c + 1) * cw));
             const tw = x1 - x0;
-            const levels = photos[assign[r * N + c]].levels;
-            let l = levels[levels.length - 1];
-            for (const cand of levels) if (cand.crop[2] >= tw * 0.85) { l = cand; break; }
+            const l = pickLevel(photos[assign[r * N + c]].levels, tw);
             const k = l.crop;
             ctx.drawImage(l.src, k[0], k[1], k[2], k[3], x0, y0, tw, y1 - y0);
           }
@@ -237,8 +287,6 @@
         const levels = photos[a].levels;
         const l = levels[levels.length - 1];
         const [sx, sy, sw, sh] = l.crop;
-        const vx0 = Math.max(0, wx0), vx1 = Math.min(W, wx1);
-        const vy0 = Math.max(0, wy0), vy1 = Math.min(H, wy1);
         ctx.globalAlpha = alpha;
         ctx.drawImage(
           l.src,
