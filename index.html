@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photomosaic</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Crect width='2' height='2' fill='%23e8a33d'/%3E%3Crect x='2' width='2' height='2' fill='%233d8be8'/%3E%3Crect y='2' width='2' height='2' fill='%2346b36b'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23c94f6d'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #000;
+    --card: rgba(22, 22, 26, 0.86);
+    --line: rgba(255, 255, 255, 0.12);
+    --text: #f2f2f4;
+    --muted: #a1a1aa;
+    --accent: #e8a33d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  canvas#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  body.idle { cursor: none; }
+  body.idle #hud { opacity: 0; pointer-events: none; }
+
+  #intro { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; z-index: 10;
+    background: radial-gradient(ellipse at 50% 30%, #1d1d24 0%, #000 70%); }
+  #intro[hidden] { display: none; }
+  #intro.drop .card { outline: 2px dashed var(--accent); outline-offset: 8px; }
+  .card { width: min(560px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 32px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -0.02em; }
+  h1 small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; letter-spacing: 0; }
+  .card p { color: var(--muted); margin: 0 0 22px; }
+  .actions { display: grid; gap: 10px; }
+  button { font: inherit; color: var(--text); background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 16px; cursor: pointer; text-align: left; transition: background .15s; }
+  button:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #1a1205; border-color: transparent; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #f0b456; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 18px; }
+  .hint kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+  #progress { margin-top: 16px; font-size: 14px; color: var(--accent); }
+
+  #hud { position: fixed; right: 16px; bottom: 16px; z-index: 5; display: flex; gap: 8px; transition: opacity .4s; }
+  #hud button { width: 42px; height: 42px; padding: 0; text-align: center; background: rgba(20,20,24,0.7);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+  #panel { position: fixed; right: 16px; bottom: 70px; z-index: 6; width: min(320px, calc(100vw - 32px));
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  #panel[hidden] { display: none; }
+  #panel h2 { margin: 0 0 12px; font-size: 15px; }
+  .row { margin-bottom: 12px; }
+  .row label { display: flex; justify-content: space-between; font-size: 13px; }
+  .row label span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .row input { width: 100%; accent-color: var(--accent); }
+  .row .note { font-size: 11.5px; color: var(--muted); }
+  .panel-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .panel-actions button { flex: 1; text-align: center; padding: 8px; font-size: 13px; }
+
+  #toast { position: fixed; left: 50%; top: 24px; transform: translate(-50%, -10px); z-index: 20; opacity: 0;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-size: 13px;
+    transition: opacity .3s, transform .3s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<section id="intro">
+  <div class="card">
+    <h1>Photomosaic <small id="version"></small></h1>
+    <p>A tribute to the Leopard “Mosaic” screen saver: each photo dissolves into a mosaic of your other
+       photos, and the camera dives into one of them, forever.</p>
+    <div class="actions">
+      <button id="use-library" class="primary" hidden></button>
+      <button id="pick-folder">Choose a folder of photos…</button>
+      <button id="pick-files">Choose individual photos…</button>
+      <button id="use-demo">Try it with demo scenes</button>
+    </div>
+    <div id="progress" hidden></div>
+    <div class="hint">Or drop photos / a folder anywhere. A few hundred photos works best.<br>
+      Keys: <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pause · <kbd>N</kbd> next · <kbd>S</kbd> settings</div>
+    <input id="folder-input" type="file" webkitdirectory multiple hidden>
+    <input id="files-input" type="file" accept="image/*" multiple hidden>
+  </div>
+</section>
+
+<div id="hud">
+  <button id="btn-load" title="Load other photos">⌂</button>
+  <button id="btn-pause" title="Pause (Space)">❚❚</button>
+  <button id="btn-next" title="Next photo (N)">⏭︎</button>
+  <button id="btn-full" title="Fullscreen (F)">⛶</button>
+  <button id="btn-settings" title="Settings (S)">⚙︎</button>
+</div>
+
+<div id="panel" hidden>
+  <h2>Settings</h2>
+  <div class="row">
+    <label for="set-grid"><span>Grid size</span><span id="val-grid"></span></label>
+    <input id="set-grid" type="range">
+    <div class="note">More tiles = clearer mosaic. Leopard’s default was 60.</div>
+  </div>
+  <div class="row">
+    <label for="set-duration"><span>Zoom duration</span><span id="val-duration"></span></label>
+    <input id="set-duration" type="range">
+  </div>
+  <div class="row">
+    <label for="set-hold"><span>Pause on each photo</span><span id="val-hold"></span></label>
+    <input id="set-hold" type="range">
+  </div>
+  <div class="row">
+    <label for="set-tint"><span>Colour blend</span><span id="val-tint"></span></label>
+    <input id="set-tint" type="range">
+    <div class="note">Lays the big photo faintly over the tiles so it reads more clearly.</div>
+  </div>
+  <div class="row">
+    <label for="set-spacing"><span>Repeat spacing</span><span id="val-spacing"></span></label>
+    <input id="set-spacing" type="range">
+    <div class="note">How far apart copies of the same photo must be.</div>
+  </div>
+  <div class="panel-actions"><button id="reset">Reset defaults</button></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Optional library built by tools/build_library.py (missing file is fine). -->
+<script src="library/manifest.js"></script>
+<script src="js/core.js"></script>
+<script src="js/library.js"></script>
+<script src="js/player.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
