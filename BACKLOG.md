@@ -6,7 +6,6 @@ _Last updated: 2026-10-06_
 
 ## 🟡 Medium
 - [ ] **Matcher in a Web Worker** — keep mosaic building off the main thread for 200-row grids; less urgent once the rotating pool caps the match size. `[feature]`
-- [ ] **Smarter zoom target** — prefer tiles whose photo is visually interesting (faces, contrast) rather than a random central cell. `[idea]`
 - [ ] **Direct Photos export helper** — script using `osxphotos` to export an album straight into `library/`. `[feature]`
 
 ## 🟢 Low / Nice to have
