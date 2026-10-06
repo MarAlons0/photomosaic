@@ -1,0 +1,131 @@
+/*
+ * The photo source: one album from iCloud Photos via PhotoKit.
+ *
+ * Every photo gets a 64 px "micro" (kept in memory: tile drawing at small sizes
+ * and colour features). Full-size versions are requested on demand.
+ */
+import Photos
+import UIKit
+
+@MainActor
+final class PhotoLibrary: ObservableObject {
+    enum Phase: Equatable {
+        case requestingAccess
+        case denied
+        case noAlbum
+        case loading(done: Int, total: Int)
+        case ready
+    }
+
+    static let preferredAlbum = "Nature"
+    static let microSize = CGSize(width: 64, height: 64)
+
+    @Published private(set) var phase: Phase = .requestingAccess
+    @Published private(set) var albumTitle = ""
+
+    private(set) var assets: [PHAsset] = []
+    private(set) var micros: [CGImage?] = []
+    /// 12 floats per photo (Features.count), for the current screen aspect.
+    private(set) var features: [Float] = []
+    private(set) var aspect: CGFloat = 16.0 / 9.0
+    private var loaded = 0
+
+    func start(aspect: CGFloat) {
+        self.aspect = aspect
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+            Task { @MainActor in
+                switch status {
+                case .authorized, .limited: self.loadAlbum()
+                default: self.phase = .denied
+                }
+            }
+        }
+    }
+
+    private static var imagesOnly: PHFetchOptions {
+        let o = PHFetchOptions()
+        o.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        return o
+    }
+
+    /// The preferred album if present, else the largest shared album.
+    private func pickAlbum() -> PHAssetCollection? {
+        var best: (PHAssetCollection, Int)?
+        for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
+            let found = PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
+            var match: PHAssetCollection?
+            found.enumerateObjects { c, _, stop in
+                if c.localizedTitle == Self.preferredAlbum { match = c; stop.pointee = true; return }
+                let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
+                if subtype == .albumCloudShared, n > (best?.1 ?? 0) { best = (c, n) }
+            }
+            if let match { return match }
+        }
+        return best?.0
+    }
+
+    private func loadAlbum() {
+        guard let album = pickAlbum() else { phase = .noAlbum; return }
+        albumTitle = album.localizedTitle ?? "Album"
+        let fetched = PHAsset.fetchAssets(in: album, options: Self.imagesOnly)
+        var list: [PHAsset] = []
+        list.reserveCapacity(fetched.count)
+        fetched.enumerateObjects { a, _, _ in list.append(a) }
+        assets = list
+        micros = Array(repeating: nil, count: list.count)
+        features = Array(repeating: 0, count: list.count * Features.count)
+        phase = .loading(done: 0, total: list.count)
+
+        let opts = PHImageRequestOptions()
+        opts.isNetworkAccessAllowed = true
+        opts.deliveryMode = .highQualityFormat   // exactly one callback per request
+        opts.resizeMode = .fast
+        loaded = 0
+        for (i, asset) in list.enumerated() {
+            PHImageManager.default().requestImage(for: asset, targetSize: Self.microSize,
+                                                  contentMode: .aspectFit, options: opts) { image, _ in
+                Task { @MainActor in
+                    if let cg = image.flatMap(upright) {
+                        self.micros[i] = cg
+                        let crop = Features.cover(width: cg.width, height: cg.height, aspect: self.aspect)
+                        let f = Features.grid(cg, crop: crop, n: 1, px: 8)
+                        for j in 0..<Features.count { self.features[i * Features.count + j] = f[j] }
+                    }
+                    self.loaded += 1
+                    if self.loaded == list.count {
+                        self.phase = .ready
+                    } else if self.loaded % 50 == 0 {
+                        self.phase = .loading(done: self.loaded, total: list.count)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Indices of photos whose micro loaded (only these can be tiles).
+    var usable: [Int] { micros.indices.filter { micros[$0] != nil } }
+
+    /// A version of photo i big enough to fill `size` pixels.
+    func large(_ i: Int, size: CGSize) async -> CGImage? {
+        let opts = PHImageRequestOptions()
+        opts.isNetworkAccessAllowed = true
+        opts.deliveryMode = .highQualityFormat
+        opts.resizeMode = .exact
+        return await withCheckedContinuation { cont in
+            PHImageManager.default().requestImage(for: assets[i], targetSize: size,
+                                                  contentMode: .aspectFill, options: opts) { image, _ in
+                cont.resume(returning: image.flatMap(upright))
+            }
+        }
+    }
+}
+
+/// CGImage with the UIImage's orientation applied (PhotoKit may return rotated images).
+func upright(_ image: UIImage) -> CGImage? {
+    if image.imageOrientation == .up, let cg = image.cgImage { return cg }
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    return UIGraphicsImageRenderer(size: image.size, format: format)
+        .image { _ in image.draw(at: .zero) }
+        .cgImage
+}
