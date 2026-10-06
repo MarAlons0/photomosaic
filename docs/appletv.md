@@ -1,6 +1,6 @@
 # Apple TV version — design
 
-_Status: shipped in v0.5.0 · 2026-10-06_
+_Status: shipped in v0.5.0; captions added in v0.6.0 · 2026-10-06_
 
 Goal: run Photomosaic natively on Apple TV, reading photos straight from iCloud Photos (including
 the **Nature** shared album) — no Mac, no server, no AirPlay.
@@ -61,6 +61,14 @@ Album picker on first launch.
    (`Shaders.swift`), so building needs no Metal Toolchain download. Smooth on Sala.
 4. ✅ **Polish** — remote controls, settings screen (Back), album picker, persisted settings,
    idle timer disabled while playing, pause badge, layered app icon + Top Shelf.
+
+## Photo captions (v0.6.0)
+
+`Captions.swift`: date from `PHAsset.creationDate`; place from `PHAsset.location`, reverse-geocoded
+with `CLGeocoder` (one request at a time, cached per photo). The player shows the caption only during
+the pause (`u == 0`) and prefetches the next photo's place when a cycle starts. Many shared-album
+photos carry no location (about 1 in 10 of the exported Nature files had GPS), so those show the date
+only; the settings screen reports the album's actual count.
 
 ## Building & installing (no Xcode clicks needed)
 

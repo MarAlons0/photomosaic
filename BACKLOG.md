@@ -9,11 +9,11 @@ _Last updated: 2026-10-06_
 - [ ] **Direct Photos export helper** — script using `osxphotos` to export an album straight into `library/`. `[feature]`
 
 ## 🟢 Low / Nice to have
-- [ ] **Photo caption** — optionally show the location/date of the photo filling the screen. `[feature]`
 - [ ] **Native `.saver` bundle** — Swift/ScreenSaver.framework port for smoother playback. `[idea]`
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Photo caption** — date and place while a photo fills the screen (Apple TV) — v0.6.0
 - [x] **AppleTV version** — native tvOS app reading iCloud Photos; see [docs/appletv.md](docs/appletv.md) — v0.5.0
 - [x] **Zoom-out mode** — plus Alternate — v0.4.0
 - [x] **Rotating tile pool** — v0.3.0

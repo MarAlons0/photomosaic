@@ -136,6 +136,9 @@ final class PhotoLibrary: ObservableObject {
         }
     }
 
+    /// How many of the album's photos carry a location (for captions).
+    var locatedCount: Int { assets.reduce(0) { $0 + ($1.location == nil ? 0 : 1) } }
+
     /// Indices of photos whose micro loaded (only these can be tiles).
     var usable: [Int] { micros.indices.filter { micros[$0] != nil } }
 

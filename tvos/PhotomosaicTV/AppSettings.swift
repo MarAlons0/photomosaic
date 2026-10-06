@@ -15,6 +15,8 @@ final class AppSettings: ObservableObject {
     @Published var hold: Int { didSet { store.set(hold, forKey: "hold") } }
     /// Colour blend, percent.
     @Published var tint: Int { didSet { store.set(tint, forKey: "tint") } }
+    /// Photo caption: "off", "date" or "place" (date and place).
+    @Published var caption: String { didSet { store.set(caption, forKey: "caption") } }
     /// PhotoKit album identifier; empty = "Nature", else the largest shared album.
     @Published var albumID: String { didSet { store.set(albumID, forKey: "albumID") } }
 
@@ -30,5 +32,6 @@ final class AppSettings: ObservableObject {
         hold = store.object(forKey: "hold") as? Int ?? 3
         tint = store.object(forKey: "tint") as? Int ?? 20
         albumID = store.string(forKey: "albumID") ?? ""
+        caption = store.string(forKey: "caption") ?? "place"
     }
 }

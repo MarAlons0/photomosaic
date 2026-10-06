@@ -34,7 +34,8 @@ struct ContentView: View {
         .onTapGesture { player?.skip() }
         .onExitCommand { openSettings() }
         .fullScreenCover(isPresented: $showSettings, onDismiss: closeSettings) {
-            SettingsView(settings: settings, albums: albums, currentAlbum: library.albumTitle)
+            SettingsView(settings: settings, albums: albums, currentAlbum: library.albumTitle,
+                         located: library.locatedCount, total: library.assets.count)
         }
         .onAppear {
             keepAwake()
@@ -91,15 +92,32 @@ struct ContentView: View {
     }
 }
 
-/// Player status while it prepares, and a pause badge while playing.
+/// Player status while it prepares; while playing, the photo caption and a pause badge.
 private struct PlayerStatus: View {
     @ObservedObject var player: Player
 
     var body: some View {
         if !player.running {
             Caption(text: player.status)
-        } else if player.paused {
-            Caption(text: "❚❚  Paused")
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                if let text = player.caption {
+                    Text(text)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.8), radius: 6)
+                        .transition(.opacity)
+                }
+                if player.paused {
+                    Text("❚❚  Paused")
+                        .font(.caption)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(80)
+            .animation(.easeInOut(duration: 0.8), value: player.caption)
         }
     }
 }

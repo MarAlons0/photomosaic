@@ -7,6 +7,8 @@ struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     let albums: [PhotoLibrary.AlbumChoice]
     let currentAlbum: String
+    let located: Int
+    let total: Int
 
     var body: some View {
         NavigationStack {
@@ -21,6 +23,15 @@ struct SettingsView: View {
                                 .tag(album.id)
                         }
                     }
+                }
+                Section {
+                    Picker("Photo caption", selection: $settings.caption) {
+                        Text("Off").tag("off")
+                        Text("Date").tag("date")
+                        Text("Date & place").tag("place")
+                    }
+                } footer: {
+                    Text("Shown while a photo fills the screen. \(located) of \(total) photos in this album have a location.")
                 }
                 Section("Animation") {
                     Picker("Direction", selection: $settings.direction) {

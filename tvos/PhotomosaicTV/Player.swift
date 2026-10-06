@@ -24,6 +24,10 @@ final class Player: NSObject, ObservableObject {
     @Published private(set) var status = "Preparing tiles…"
     @Published private(set) var running = false
     @Published var paused = false
+    /// Caption for the photo filling the screen during the pause; nil while zooming.
+    @Published private(set) var caption: String?
+    private let captions = Captions()
+    private var captionPhoto: Int?
 
     let library: PhotoLibrary
     let settings: AppSettings
@@ -153,6 +157,7 @@ final class Player: NSObject, ObservableObject {
         }
         cache?.pinned = pins
         for i in pins { cache?.request(.hires, i) }
+        captions.prefetch(library.assets[plan.end], mode: settings.caption)
         if plan.dir == .zoomOut { prefetchMid(plan) }
         planNext()
     }
@@ -228,6 +233,18 @@ final class Player: NSObject, ObservableObject {
         planNext()
     }
 
+    /// Show the caption of `photo` (nil hides it); text arrives once dates/places are ready.
+    private func updateCaption(showing photo: Int?) {
+        guard photo != captionPhoto else { return }
+        captionPhoto = photo
+        guard let photo else { caption = nil; return }
+        let asset = library.assets[photo], mode = settings.caption
+        Task {
+            let text = await captions.text(for: asset, mode: mode)
+            if self.captionPhoto == photo { self.caption = text }
+        }
+    }
+
     /* ---------- camera ---------- */
 
     private var screen = CGSize(width: 3840, height: 2160)
@@ -275,6 +292,7 @@ final class Player: NSObject, ObservableObject {
                 plan = next
                 u = 0
             }
+            updateCaption(showing: u == 0 ? plan.shown : nil)
             let e = (1 - cos(Double.pi * min(1, u))) / 2
             draw(plan, p: plan.dir == .zoomOut ? 1 - e : e, enc: enc, atlas: atlas, cache: cache)
         }

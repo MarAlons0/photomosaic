@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.6.0] – 2026-10-06
+### Added
+- **Photo captions (Apple TV)**: while a photo fills the screen during the pause, its date — and place, when the photo has a location — fades in at the bottom left (e.g. *June 30, 2024 · Celina, OH*), and fades out as the next zoom starts. Places come from reverse geocoding the photo's coordinates (no location permission needed), looked up ahead of time and cached. New *Photo caption* setting: Off / Date / Date & place; the settings screen shows how many photos in the album have a location.
+
 ## [0.5.2] – 2026-10-06
 ### Changed
 - Apple TV: the rotating tile pool now deals from a **shuffled deck** like the web player, so every photo in the album is used as a tile in turn (at least once every three cycles for Nature's 4,425 photos) instead of by random draw. Match cost is unchanged (1,500 photos per mosaic).
