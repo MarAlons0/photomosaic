@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.5.1] – 2026-10-06
+### Fixed
+- Apple TV: the system screen saver could start during playback. The app now re-asserts "keep the screen awake" whenever it becomes active and every minute while running.
+
 ## [0.5.0] – 2026-10-06
 ### Added
 - **Apple TV app** (`tvos/`): a native Swift/Metal version of the player that reads photos straight from iCloud Photos on the Apple TV — including shared albums such as Nature — with no Mac, server or export. See [docs/appletv.md](docs/appletv.md).

@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var albums: [PhotoLibrary.AlbumChoice] = []
     @State private var before: (album: String, direction: String, grid: Int)?
     @State private var wasPaused = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private let aspect: CGFloat = 16.0 / 9.0
 
@@ -36,15 +37,26 @@ struct ContentView: View {
             SettingsView(settings: settings, albums: albums, currentAlbum: library.albumTitle)
         }
         .onAppear {
-            UIApplication.shared.isIdleTimerDisabled = true   // keep the TV's own screen saver away
+            keepAwake()
             library.start(aspect: aspect, albumID: settings.albumID)
         }
+        // tvOS can drop the "no screen saver" request (e.g. when the app returns to the
+        // foreground), so re-assert it whenever we become active and every minute.
+        .onChange(of: scenePhase) { _, phase in if phase == .active { keepAwake() } }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in keepAwake() }
         .onChange(of: library.phase) { _, phase in
             guard phase == .ready, player == nil else { return }
             let p = Player(library: library, settings: settings)
             player = p
             Task { await p.start() }
         }
+    }
+
+    /// Keep the Apple TV's own screen saver from starting while the mosaic plays.
+    private func keepAwake() {
+        let app = UIApplication.shared
+        app.isIdleTimerDisabled = false
+        app.isIdleTimerDisabled = true
     }
 
     private func openSettings() {
