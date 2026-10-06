@@ -1,8 +1,8 @@
 /*
  * The photo source: one album from iCloud Photos via PhotoKit.
  *
- * Every photo gets a 64 px "micro" (kept in memory: tile drawing at small sizes
- * and colour features). Full-size versions are requested on demand.
+ * Every photo gets a "micro" covering 96x54 px (kept in memory: the tile atlas and
+ * colour features). Larger versions are requested on demand.
  */
 import Photos
 import UIKit
@@ -18,7 +18,7 @@ final class PhotoLibrary: ObservableObject {
     }
 
     static let preferredAlbum = "Nature"
-    static let microSize = CGSize(width: 64, height: 64)
+    static let microSize = CGSize(width: 96, height: 54)   // one 16:9 atlas slot
 
     @Published private(set) var phase: Phase = .requestingAccess
     @Published private(set) var albumTitle = ""
@@ -82,8 +82,9 @@ final class PhotoLibrary: ObservableObject {
         opts.resizeMode = .fast
         loaded = 0
         for (i, asset) in list.enumerated() {
+            // aspectFill: even portrait photos keep 96x54 px after the 16:9 crop.
             PHImageManager.default().requestImage(for: asset, targetSize: Self.microSize,
-                                                  contentMode: .aspectFit, options: opts) { image, _ in
+                                                  contentMode: .aspectFill, options: opts) { image, _ in
                 Task { @MainActor in
                     if let cg = image.flatMap(upright) {
                         self.micros[i] = cg

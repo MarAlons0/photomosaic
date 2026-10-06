@@ -1,6 +1,6 @@
 # Apple TV version — design
 
-_Status: milestone 2 done (still mosaics) · 2026-10-06_
+_Status: milestone 3 done (zoom player) · 2026-10-06_
 
 Goal: run Photomosaic natively on Apple TV, reading photos straight from iCloud Photos (including
 the **Nature** shared album) — no Mac, no server, no AirPlay.
@@ -55,7 +55,10 @@ Album picker on first launch.
 2. ✅ **Port matcher + texture** — build mosaics from the chosen album; show a static mosaic.
    On Sala: all 4,425 Nature micros load in ~20 s; a 100×100 4K mosaic builds in ~2 s (CPU tile
    drawing dominates — Metal in milestone 3 replaces it).
-3. **Zoom player** — Metal renderer, in/out/alternate, seamless cycles.
+3. ✅ **Zoom player** — Metal renderer, in/out/alternate, seamless cycles.
+   Micros in a 96×54-slot atlas (one instanced draw for all small tiles); 480 px and full-size
+   textures on demand; the next cycle is planned in the background. Shaders compile at launch
+   (`Shaders.swift`), so building needs no Metal Toolchain download. Smooth on Sala.
 4. **Polish** — remote controls, settings screen, idle-timer handling, 4K performance pass.
 
 ## Building & installing (no Xcode clicks needed)
