@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "idiom": "tv",
+      "scale": "1x",
+      "filename": "top-shelf-image-wide@1x.png"
+    },
+    {
+      "idiom": "tv",
+      "scale": "2x",
+      "filename": "top-shelf-image-wide@2x.png"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

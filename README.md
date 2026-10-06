@@ -84,6 +84,13 @@ file:///Users/<you>/Documents/Claude-code-projects/Photomosaic/index.html?saver=
 > serve the folder instead (`python3 -m http.server 8765` from this directory) and use
 > `http://localhost:8765/?saver=1`.
 
+## Apple TV
+
+A native tvOS version lives in [`tvos/`](tvos/). It reads photos straight from iCloud Photos on the
+Apple TV (shared albums included), so it needs no Mac or export. Build and install it with Xcode and a
+free Apple ID (installs last 7 days) — see [docs/appletv.md](docs/appletv.md). On the remote: Back opens
+settings, Play/Pause pauses, click skips ahead.
+
 ## How it works
 
 - **Matching.** Every photo is summarised by the average CIELAB colour of its four quadrants

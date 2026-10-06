@@ -21,22 +21,12 @@ struct TileInstance {
 
 @MainActor
 final class Player: NSObject, ObservableObject {
-    enum DirectionSetting { case zoomIn, zoomOut, alternate }
-
-    struct Settings {
-        var direction = DirectionSetting.alternate
-        var grid = 120
-        var duration = 22.0
-        var hold = 3.0
-        var tint: Float = 0.2
-    }
-
     @Published private(set) var status = "Preparing tiles…"
     @Published private(set) var running = false
-    var settings = Settings()
-    var paused = false
+    @Published var paused = false
 
     let library: PhotoLibrary
+    let settings: AppSettings
     let device: MTLDevice
     private let queue: MTLCommandQueue
     private var atlasPipeline: MTLRenderPipelineState!
@@ -48,6 +38,7 @@ final class Player: NSObject, ObservableObject {
     private var current: CyclePlan?
     private var pending: CyclePlan?
     private var planning = false
+    private var planGeneration = 0
     private var elapsed = 0.0
     private var lastTime: CFTimeInterval = 0
     private var recent: [Int] = []
@@ -59,8 +50,9 @@ final class Player: NSObject, ObservableObject {
 
     private let aspect: CGFloat = 16.0 / 9.0
 
-    init(library: PhotoLibrary) {
+    init(library: PhotoLibrary, settings: AppSettings) {
         self.library = library
+        self.settings = settings
         device = MTLCreateSystemDefaultDevice()!
         queue = device.makeCommandQueue()!
         let sd = MTLSamplerDescriptor()
@@ -112,7 +104,7 @@ final class Player: NSObject, ObservableObject {
         status = "Building first mosaic…"
         let usable = library.usable
         guard let first = usable.randomElement() else { status = "No photos"; return }
-        let dir: Direction = settings.direction == .zoomOut ? .zoomOut : .zoomIn
+        let dir: Direction = settings.direction == "out" ? .zoomOut : .zoomIn
         let shown = dir == .zoomOut ? pickUpcoming(excluding: first) : nil
         let plan = await makePlan(dir: dir, mosaicPhoto: first, shown: shown)
         if let shown { await fetchHires(shown) }
@@ -162,16 +154,18 @@ final class Player: NSObject, ObservableObject {
     private func planNext() {
         guard let cur = current, !planning else { return }
         planning = true
+        let gen = planGeneration
         let dir: Direction
         switch settings.direction {
-        case .zoomIn: dir = .zoomIn
-        case .zoomOut: dir = .zoomOut
-        case .alternate: dir = cur.dir == .zoomIn ? .zoomOut : .zoomIn
+        case "in": dir = .zoomIn
+        case "out": dir = .zoomOut
+        default: dir = cur.dir == .zoomIn ? .zoomOut : .zoomIn
         }
         let shown = cur.end
         let mosaicPhoto = dir == .zoomIn ? shown : pickUpcoming(excluding: shown)
         Task {
             let plan = await makePlan(dir: dir, mosaicPhoto: mosaicPhoto, shown: dir == .zoomOut ? shown : nil)
+            guard gen == self.planGeneration else { return }   // settings changed meanwhile
             self.pending = plan
             self.planning = false
         }
@@ -201,6 +195,15 @@ final class Player: NSObject, ObservableObject {
         if let next = pending { install(next) }
     }
 
+    /// Direction or grid size changed: re-plan the upcoming cycle with the new settings.
+    /// (Timing and colour blend are read every frame.)
+    func settingsChanged() {
+        planGeneration += 1
+        pending = nil
+        planning = false
+        planNext()
+    }
+
     /* ---------- camera ---------- */
 
     private var screen = CGSize(width: 3840, height: 2160)
@@ -221,7 +224,8 @@ final class Player: NSObject, ObservableObject {
         let a0 = log(max(tilePt0, 2)), a1 = log(max(tilePt0 * 3, 40))
         let reveal = smooth((log(tilePt) - a0) / (a1 - a0))
         let handoff = 1 - smooth((p - 0.72) / 0.22)
-        return Float((1 + (Double(settings.tint) - 1) * reveal) * handoff)
+        let tint = Double(settings.tint) / 100
+        return Float((1 + (tint - 1) * reveal) * handoff)
     }
 
     /* ---------- drawing ---------- */
@@ -240,7 +244,8 @@ final class Player: NSObject, ObservableObject {
 
         if var plan = current, let atlas, let cache {
             if !paused { elapsed += dt }
-            var u = elapsed > settings.hold ? (elapsed - settings.hold) / settings.duration : 0
+            let hold = Double(settings.hold), duration = Double(settings.duration)
+            var u = elapsed > hold ? (elapsed - hold) / duration : 0
             if u >= 1, let next = pending {   // otherwise hold on the end frame until it's ready
                 install(next)
                 plan = next

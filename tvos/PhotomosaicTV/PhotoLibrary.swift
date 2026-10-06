@@ -30,12 +30,16 @@ final class PhotoLibrary: ObservableObject {
     private(set) var aspect: CGFloat = 16.0 / 9.0
     private var loaded = 0
 
-    func start(aspect: CGFloat) {
+    private var generation = 0
+
+    /// Load album `albumID` ("" = the preferred album, else the largest shared album).
+    /// Safe to call again to switch albums.
+    func start(aspect: CGFloat, albumID: String) {
         self.aspect = aspect
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
             Task { @MainActor in
                 switch status {
-                case .authorized, .limited: self.loadAlbum()
+                case .authorized, .limited: self.loadAlbum(id: albumID)
                 default: self.phase = .denied
                 }
             }
@@ -48,8 +52,33 @@ final class PhotoLibrary: ObservableObject {
         return o
     }
 
-    /// The preferred album if present, else the largest shared album.
-    private func pickAlbum() -> PHAssetCollection? {
+    struct AlbumChoice: Identifiable {
+        let id: String
+        let title: String
+        let count: Int
+        let shared: Bool
+    }
+
+    /// Albums with photos, for the settings picker: shared albums first.
+    func albumChoices() -> [AlbumChoice] {
+        var out: [AlbumChoice] = []
+        for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
+            PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
+                .enumerateObjects { c, _, _ in
+                    let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
+                    guard n > 1 else { return }
+                    out.append(AlbumChoice(id: c.localIdentifier, title: c.localizedTitle ?? "Album",
+                                           count: n, shared: subtype == .albumCloudShared))
+                }
+        }
+        return out
+    }
+
+    private func pickAlbum(id: String) -> PHAssetCollection? {
+        if !id.isEmpty,
+           let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
+            return c
+        }
         var best: (PHAssetCollection, Int)?
         for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
             let found = PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
@@ -64,13 +93,16 @@ final class PhotoLibrary: ObservableObject {
         return best?.0
     }
 
-    private func loadAlbum() {
-        guard let album = pickAlbum() else { phase = .noAlbum; return }
+    private func loadAlbum(id: String) {
+        generation += 1
+        let gen = generation
+        guard let album = pickAlbum(id: id) else { phase = .noAlbum; return }
         albumTitle = album.localizedTitle ?? "Album"
         let fetched = PHAsset.fetchAssets(in: album, options: Self.imagesOnly)
         var list: [PHAsset] = []
         list.reserveCapacity(fetched.count)
         fetched.enumerateObjects { a, _, _ in list.append(a) }
+        guard list.count > 1 else { phase = .noAlbum; return }
         assets = list
         micros = Array(repeating: nil, count: list.count)
         features = Array(repeating: 0, count: list.count * Features.count)
@@ -86,6 +118,7 @@ final class PhotoLibrary: ObservableObject {
             PHImageManager.default().requestImage(for: asset, targetSize: Self.microSize,
                                                   contentMode: .aspectFill, options: opts) { image, _ in
                 Task { @MainActor in
+                    guard gen == self.generation else { return }   // an older album's late reply
                     if let cg = image.flatMap(upright) {
                         self.micros[i] = cg
                         let crop = Features.cover(width: cg.width, height: cg.height, aspect: self.aspect)

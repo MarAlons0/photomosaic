@@ -1,6 +1,6 @@
 # Apple TV version — design
 
-_Status: milestone 3 done (zoom player) · 2026-10-06_
+_Status: shipped in v0.5.0 · 2026-10-06_
 
 Goal: run Photomosaic natively on Apple TV, reading photos straight from iCloud Photos (including
 the **Nature** shared album) — no Mac, no server, no AirPlay.
@@ -59,7 +59,8 @@ Album picker on first launch.
    Micros in a 96×54-slot atlas (one instanced draw for all small tiles); 480 px and full-size
    textures on demand; the next cycle is planned in the background. Shaders compile at launch
    (`Shaders.swift`), so building needs no Metal Toolchain download. Smooth on Sala.
-4. **Polish** — remote controls, settings screen, idle-timer handling, 4K performance pass.
+4. ✅ **Polish** — remote controls, settings screen (Back), album picker, persisted settings,
+   idle timer disabled while playing, pause badge, layered app icon + Top Shelf.
 
 ## Building & installing (no Xcode clicks needed)
 

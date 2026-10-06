@@ -4,6 +4,14 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.5.0] – 2026-10-06
+### Added
+- **Apple TV app** (`tvos/`): a native Swift/Metal version of the player that reads photos straight from iCloud Photos on the Apple TV — including shared albums such as Nature — with no Mac, server or export. See [docs/appletv.md](docs/appletv.md).
+  - Zoom in / out / alternate with seamless cycles; the next mosaic is built in the background while the current zoom plays.
+  - Micros in a GPU texture atlas (one draw call for all small tiles); 480 px and full-size versions stream from iCloud on demand.
+  - Settings screen on the remote's Back button: album picker, direction, grid size, zoom duration, pause, colour blend — remembered between launches. Play/Pause pauses (with a badge), click skips ahead.
+  - Layered parallax app icon and Top Shelf images (`tvos/tools/make_icons.py`, abstract artwork).
+
 ## [0.4.0] – 2026-10-05
 ### Added
 - **Zoom-out mode**: each photo shrinks into a tile of the next photo's mosaic, which then resolves into that photo — the reverse of the original dive. **Alternate** switches direction every cycle. Set it in the settings panel (*Direction*) or with `?direction=in|out|alternate`.
