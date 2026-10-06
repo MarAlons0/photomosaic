@@ -4,6 +4,13 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.6.1] – 2026-10-06
+### Changed
+- Apple TV remote: **click** pauses/resumes the mosaic and **swipe right** skips to the next photo; **Play/Pause** is left to the system, so it controls Apple Music (or other audio) playing in the background.
+
+### Fixed
+- Apple TV: leaving the app with settings open made it reopen on the settings screen with the mosaic paused (and Play/Pause then stopped background music). Settings now close when the app goes to the background.
+
 ## [0.6.0] – 2026-10-06
 ### Added
 - **Photo captions (Apple TV)**: while a photo fills the screen during the pause, its date — and place, when the photo has a location — fades in at the bottom left (e.g. *June 30, 2024 · Celina, OH*), and fades out as the next zoom starts. Places come from reverse geocoding the photo's coordinates (no location permission needed), looked up ahead of time and cached. New *Photo caption* setting: Off / Date / Date & place; the settings screen shows how many photos in the album have a location.

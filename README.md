@@ -89,7 +89,8 @@ file:///Users/<you>/Documents/Claude-code-projects/Photomosaic/index.html?saver=
 A native tvOS version lives in [`tvos/`](tvos/). It reads photos straight from iCloud Photos on the
 Apple TV (shared albums included), so it needs no Mac or export. Build and install it with Xcode and a
 free Apple ID (installs last 7 days) — see [docs/appletv.md](docs/appletv.md). On the remote: Back opens
-settings, Play/Pause pauses, click skips ahead.
+settings, click pauses, swipe right skips ahead, and Play/Pause controls any music playing in the
+background.
 
 ## How it works
 

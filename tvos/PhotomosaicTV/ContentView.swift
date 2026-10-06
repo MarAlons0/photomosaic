@@ -1,7 +1,8 @@
 /*
  * The app's one screen: load the album, then run the zoom player full screen.
- * Siri Remote: Play/Pause pauses, clicking skips to the next photo, Back opens
- * settings (the TV/Home button leaves the app).
+ * Siri Remote: click pauses/resumes, right skips to the next photo, Back opens
+ * settings (the TV/Home button leaves the app). Play/Pause is left to the system,
+ * so it controls music playing in the background.
  */
 import SwiftUI
 
@@ -30,8 +31,8 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .focusable()
-        .onPlayPauseCommand { player?.paused.toggle() }
-        .onTapGesture { player?.skip() }
+        .onTapGesture { player?.paused.toggle() }
+        .onMoveCommand { direction in if direction == .right { player?.skip() } }
         .onExitCommand { openSettings() }
         .fullScreenCover(isPresented: $showSettings, onDismiss: closeSettings) {
             SettingsView(settings: settings, albums: albums, currentAlbum: library.albumTitle,
@@ -43,7 +44,11 @@ struct ContentView: View {
         }
         // tvOS can drop the "no screen saver" request (e.g. when the app returns to the
         // foreground), so re-assert it whenever we become active and every minute.
-        .onChange(of: scenePhase) { _, phase in if phase == .active { keepAwake() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { keepAwake() }
+            // Leaving the app closes settings, so it always reopens on the running mosaic.
+            if phase == .background && showSettings { showSettings = false }
+        }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in keepAwake() }
         .onChange(of: library.phase) { _, phase in
             guard phase == .ready, player == nil else { return }

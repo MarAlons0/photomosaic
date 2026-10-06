@@ -53,7 +53,7 @@ struct SettingsView: View {
                     }
                 }
                 Section {
-                    Text("Play/Pause pauses · click skips to the next photo · Back opens and closes settings")
+                    Text("Click pauses · swipe right skips to the next photo · Back opens and closes settings · Play/Pause controls music")
                         .foregroundStyle(.secondary)
                 }
             }
