@@ -4,6 +4,13 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.5.2] – 2026-10-06
+### Changed
+- Apple TV: the rotating tile pool now deals from a **shuffled deck** like the web player, so every photo in the album is used as a tile in turn (at least once every three cycles for Nature's 4,425 photos) instead of by random draw. Match cost is unchanged (1,500 photos per mosaic).
+
+### Fixed
+- Apple TV: an album with a single usable photo could crash the planner.
+
 ## [0.5.1] – 2026-10-06
 ### Fixed
 - Apple TV: the system screen saver could start during playback. The app now re-asserts "keep the screen awake" whenever it becomes active and every minute while running.

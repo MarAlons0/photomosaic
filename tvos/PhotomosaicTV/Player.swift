@@ -43,6 +43,12 @@ final class Player: NSObject, ObservableObject {
     private var lastTime: CFTimeInterval = 0
     private var recent: [Int] = []
 
+    /// Rotating tile pool: each mosaic gets the next `poolSize` photos of a shuffled
+    /// deck, reshuffled when used up — bounded match cost, and every photo comes round.
+    private static let poolSize = 1500
+    private var deck: [Int] = []
+    private var deckPos = 0
+
     private static let maxInstances = 200 * 200
     private var buffers: [MTLBuffer] = []
     private var bufferIndex = 0
@@ -124,11 +130,11 @@ final class Player: NSObject, ObservableObject {
     private func makePlan(dir: Direction, mosaicPhoto: Int, shown: Int?) async -> CyclePlan {
         cache?.pinned.insert(mosaicPhoto)
         let image = await fetchHires(mosaicPhoto) ?? library.micros[mosaicPhoto]!
-        let n = settings.grid, features = library.features, usable = library.usable
+        let n = settings.grid, features = library.features, pool = drawPool(excluding: mosaicPhoto)
         let recentSet = Set(recent), aspect = aspect
         return await Task.detached(priority: .userInitiated) {
             Planner.plan(dir: dir, mosaicPhoto: mosaicPhoto, image: image, shown: shown, n: n,
-                         features: features, usable: usable, recent: recentSet, aspect: aspect)
+                         features: features, pool: pool, recent: recentSet, aspect: aspect)
         }.value
     }
 
@@ -169,6 +175,24 @@ final class Player: NSObject, ObservableObject {
             self.pending = plan
             self.planning = false
         }
+    }
+
+    /// The next photos from the deck (every usable photo if the library is small).
+    private func drawPool(excluding mosaicPhoto: Int) -> [Int] {
+        let usable = library.usable
+        if usable.count - 1 <= Self.poolSize {
+            let others = usable.filter { $0 != mosaicPhoto }
+            return others.isEmpty ? usable : others   // a one-photo library tiles itself
+        }
+        var picked = Set<Int>()
+        var pool: [Int] = []
+        while pool.count < Self.poolSize {
+            if deckPos >= deck.count { deck = usable.shuffled(); deckPos = 0 }
+            let i = deck[deckPos]
+            deckPos += 1
+            if i != mosaicPhoto, picked.insert(i).inserted { pool.append(i) }
+        }
+        return pool
     }
 
     private func pickUpcoming(excluding: Int) -> Int {
