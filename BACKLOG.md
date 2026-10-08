@@ -1,8 +1,9 @@
 # Photomosaic — Backlog
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-08_
 
 ## 🔴 High
-- [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. `[chore]`
+- [ ] **Loading can hang at 0%** — `await img.decode()` never settles in a document that is not rendering, parking every pool worker; no error, progress frozen. Likely cause of a blank screen saver. Repro + fix in [docs/decode-hang.md](docs/decode-hang.md). `[bug]`
+- [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. Rule out the decode hang above first — it produces the same blank page. `[chore]`
 
 ## 🟡 Medium
 - [ ] **Matcher in a Web Worker** — keep mosaic building off the main thread for 200-row grids; less urgent once the rotating pool caps the match size. `[feature]`
