@@ -1,7 +1,7 @@
 # Bug: loading can hang at 0% — `await img.decode()` never settles
 
 **Found:** 2026-10-08, while integrating this engine into the Looking4Nature gallery.
-**Status:** present in `js/library.js`; already fixed in the gallery's own loader (see the end).
+**Status:** **fixed upstream in v0.6.2** (see *Upstream fix* below); also fixed in the gallery's own loader.
 **Severity:** hangs the whole load, silently — no error, no timeout, progress stuck at 0%.
 
 ## Symptom
@@ -144,3 +144,33 @@ That loader also sets `img.crossOrigin = 'anonymous'`, which this project's `loa
 needed because `PM.gridFeatures` calls `getImageData`, and a cross-origin image taints the canvas.
 Not a bug here (upstream loads same-origin files and `data:` URIs), but worth knowing if remote
 image sources are ever supported directly.
+
+## Upstream fix (v0.6.2)
+
+Applied in `js/library.js`, with one change from the suggestion above: instead of capping the
+`decode()` wait at 2 s, `loadImg` **no longer calls `decode()` at all**.
+
+Reason: the cap fixes the hang but not the cost. In a non-rendering document *every* decode waits out
+the full cap, so with 8 workers loading runs at ~4 photos/s — measured **30 of 4,425** photos after
+10 s under device emulation, i.e. ~18 minutes to start. Dropping the up-front decode loses nothing:
+
+- micros/tiles (≤ 320 px) decode in ~1 ms on first draw;
+- full-size photos, where an up-front decode does prevent a dropped frame, are already converted
+  with `createImageBitmap(img)` in the hires loader — it decodes off-thread and doesn't depend on
+  rendering.
+
+Also added the per-item timeout suggested above: `pool()` gives up on an item after 30 s (warning in
+the console), and the loaders return a snapshot of their results so a late finisher can't join a
+running player half-initialised.
+
+The fix also matters after start-up: the player's on-demand loads (tiny/mid/hires) go through
+`loadImg` too, and each stuck decode used to occupy one of its 6 loading slots permanently.
+
+**Verified** (Chromium, browser pane): under mobile emulation the old code stalled at
+"Loading library…" with 0 photos after 10 s; the fixed code loaded all 4,425 and was playing within
+~10 s, with full-size bitmaps and 320 px tiles continuing to load (no stuck slots). The old code also
+hung in a normal 1440×900 window simply because the pane was hidden while loading.
+
+**For the gallery:** re-copy the upstream `library.js` (not the capped-wait version above), and
+consider the same change in `cloudinary-loader.js` — with ~700 photos the 2 s cap would also cost
+minutes whenever the page loads hidden.

@@ -4,6 +4,11 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.6.2] – 2026-10-08
+### Fixed
+- **Browser player could hang at "Loading library…"** with no error when the page wasn't being rendered (background tab, hidden window, device emulation — and likely a screen-saver host): `img.decode()` never settles there, and stuck decodes parked every loading worker. Images no longer wait on `decode()`; full-size photos are still decoded off-thread via `createImageBitmap`, which doesn't depend on rendering. The same stuck decodes could also freeze on-demand tile loading mid-play. Reported from the Looking4Nature integration — see [docs/decode-hang.md](docs/decode-hang.md).
+- The loading pool now gives up on any single photo after 30 s, so a future stall skips that photo instead of freezing the whole load.
+
 ## [0.6.1] – 2026-10-06
 ### Changed
 - Apple TV remote: **click** pauses/resumes the mosaic and **swipe right** skips to the next photo; **Play/Pause** is left to the system, so it controls Apple Music (or other audio) playing in the background.

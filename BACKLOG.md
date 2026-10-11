@@ -2,8 +2,7 @@
 _Last updated: 2026-10-08_
 
 ## 🔴 High
-- [ ] **Loading can hang at 0%** — `await img.decode()` never settles in a document that is not rendering, parking every pool worker; no error, progress frozen. Likely cause of a blank screen saver. Repro + fix in [docs/decode-hang.md](docs/decode-hang.md). `[bug]`
-- [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. Rule out the decode hang above first — it produces the same blank page. `[chore]`
+- [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. The decode hang that produced the same blank page is fixed in v0.6.2 ([docs/decode-hang.md](docs/decode-hang.md)). `[chore]`
 
 ## 🟡 Medium
 - [ ] **Matcher in a Web Worker** — keep mosaic building off the main thread for 200-row grids; less urgent once the rotating pool caps the match size. `[feature]`
@@ -14,6 +13,7 @@ _Last updated: 2026-10-08_
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Loading can hang at 0%** — decode() no longer blocks loading; per-photo pool timeout — v0.6.2
 - [x] **Photo caption** — date and place while a photo fills the screen (Apple TV) — v0.6.0
 - [x] **AppleTV version** — native tvOS app reading iCloud Photos; see [docs/appletv.md](docs/appletv.md) — v0.5.0
 - [x] **Zoom-out mode** — plus Alternate — v0.4.0

@@ -74,12 +74,16 @@
     return [w * s, h * s];
   }
 
+  // No img.decode() here: it never settles in a document that isn't being rendered
+  // (background tab, hidden window, device emulation, possibly a screen-saver host), which
+  // parked every loading worker. Small images decode in ~1 ms on first draw anyway; full-size
+  // ones are decoded off-thread by createImageBitmap (see hires below), which doesn't depend
+  // on rendering. See docs/decode-hang.md.
   function loadImg(url) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.decoding = 'async';
-      // Decode off the main thread now, so the first drawImage doesn't stall a frame.
-      img.onload = () => (img.decode ? img.decode() : Promise.resolve()).then(() => resolve(img), () => resolve(img));
+      img.onload = () => resolve(img);
       img.onerror = () => reject(new Error('Could not load ' + url.slice(0, 80)));
       img.src = url;
     });
@@ -113,13 +117,20 @@
     return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.85));
   }
 
-  // Run fn over items with limited concurrency, reporting progress.
-  async function pool(items, limit, fn, onProgress) {
+  // Run fn over items with limited concurrency, reporting progress. An item that takes
+  // longer than `timeout` ms is given up on (with a warning), so a stall skips one photo
+  // instead of freezing the whole load.
+  async function pool(items, limit, fn, onProgress, timeout = 30000) {
     let next = 0, done = 0;
     const worker = async () => {
       while (next < items.length) {
         const i = next++;
-        try { await fn(items[i], i); } catch (e) { console.warn(e); }
+        let timer;
+        const giveUp = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Gave up on item ' + i + ' after ' + timeout + ' ms')), timeout);
+        });
+        try { await Promise.race([fn(items[i], i), giveUp]); } catch (e) { console.warn(e); }
+        clearTimeout(timer);
         done++;
         if (onProgress && (done % 10 === 0 || done === items.length)) onProgress(done, items.length);
       }
@@ -180,7 +191,7 @@
           },
         }));
       }, onProgress);
-      return photos;
+      return photos.slice();   // late finishers (after a pool timeout) must not join later
     },
 
     async fromManifest(manifest, onProgress) {
@@ -193,8 +204,8 @@
           async tiny() { return clean(await loadImg(e.t)); },
           async mid() { return { src: await loadImg(base + e.m), tainted: fromDisk }; },
           async hires() {
-            // An ImageBitmap keeps its decoded pixels; an <img> may be re-decoded on
-            // first draw, which stalls the zoom for tens of ms at full size.
+            // An ImageBitmap is decoded off-thread and keeps its pixels; an <img> may be
+            // (re-)decoded on first draw, which stalls the zoom for tens of ms at full size.
             const img = await loadImg(base + e.f);
             let src = img;
             try { src = await createImageBitmap(img); } catch (err) { /* keep the <img> */ }
@@ -202,7 +213,7 @@
           },
         }));
       }, onProgress);
-      return photos;
+      return photos.slice();   // late finishers (after a pool timeout) must not join later
     },
 
     // Scenes are vector-painted, so every size is rendered fresh on demand.
