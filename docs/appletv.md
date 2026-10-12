@@ -80,8 +80,14 @@ xcrun devicectl device install app --device <UDID> <DerivedData>/Build/Products/
 xcrun devicectl device process launch --device <UDID> com.marioalonso.PhotomosaicTV
 ```
 
-`xcrun devicectl list devices` shows the UDID. Free-team installs expire after 7 days — re-run the
-install to renew. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
+`xcrun devicectl list devices` shows the UDID. Free-team installs expire after 7 days, and **a plain
+reinstall does not renew them**: Xcode keeps reusing the existing provisioning profile until it
+expires. To renew, move the old profile out of
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles/` (it's named
+"tvOS Team Provisioning Profile: com.marioalonso.PhotomosaicTV"), rebuild with
+`-allowProvisioningUpdates` so a fresh 7-day profile is fetched, and install again. Check with
+`security cms -D -i <App>.app/embedded.mobileprovision | plutil -extract ExpirationDate raw -o - -`.
+The Mac must be on the same network as the Apple TV; the TV can be asleep. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
 uses a folder-synchronised group, so any `.swift` file added to `tvos/PhotomosaicTV/` is built.
 
 ## Repo layout
