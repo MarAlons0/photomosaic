@@ -4,6 +4,14 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.6.3] – 2026-10-13
+### Changed
+- Apple TV: the default album is now **Portfolio**, preferring the library album (full resolution, locations kept) over a shared one of the same name. An album picked under the old default ("Nature") is forgotten once so the new default takes effect.
+- Apple TV: the album picker groups **Shared albums** and **My albums**, sorts each A–Z, marks the album playing now, and hides albums with fewer than 100 photos (too few for a mosaic).
+
+### Fixed
+- Apple TV captions: place lookups that fail are retried instead of being remembered as "no place"; photos within ~1 km share one lookup (fewer requests, no rate limiting); places without a town fall back to the park or natural feature (e.g. *Yellowstone National Park, WY*).
+
 ## [0.6.2] – 2026-10-08
 ### Fixed
 - **Browser player could hang at "Loading library…"** with no error when the page wasn't being rendered (background tab, hidden window, device emulation — and likely a screen-saver host): `img.decode()` never settles there, and stuck decodes parked every loading worker. Images no longer wait on `decode()`; full-size photos are still decoded off-thread via `createImageBitmap`, which doesn't depend on rendering. The same stuck decodes could also freeze on-demand tile loading mid-play. Reported from the Looking4Nature integration — see [docs/decode-hang.md](docs/decode-hang.md).

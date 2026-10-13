@@ -17,7 +17,7 @@ final class PhotoLibrary: ObservableObject {
         case ready
     }
 
-    static let preferredAlbum = "Nature"
+    static let preferredAlbum = "Portfolio"
     static let microSize = CGSize(width: 96, height: 54)   // one 16:9 atlas slot
 
     @Published private(set) var phase: Phase = .requestingAccess
@@ -59,19 +59,24 @@ final class PhotoLibrary: ObservableObject {
         let shared: Bool
     }
 
-    /// Albums with photos, for the settings picker: shared albums first.
+    /// Albums big enough for a mosaic (100+ photos), for the settings picker:
+    /// shared albums first, each group A–Z.
+    static let minAlbumSize = 100
+
     func albumChoices() -> [AlbumChoice] {
         var out: [AlbumChoice] = []
         for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
             PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
                 .enumerateObjects { c, _, _ in
                     let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
-                    guard n > 1 else { return }
+                    guard n >= Self.minAlbumSize else { return }
                     out.append(AlbumChoice(id: c.localIdentifier, title: c.localizedTitle ?? "Album",
                                            count: n, shared: subtype == .albumCloudShared))
                 }
         }
-        return out
+        return out.sorted {
+            $0.shared != $1.shared ? $0.shared : $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
     }
 
     private func pickAlbum(id: String) -> PHAssetCollection? {
@@ -79,17 +84,23 @@ final class PhotoLibrary: ObservableObject {
            let c = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject {
             return c
         }
-        var best: (PHAssetCollection, Int)?
-        for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
-            let found = PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
+        // The preferred album by name: library albums first (full resolution, locations kept),
+        // then shared ones.
+        for subtype in [PHAssetCollectionSubtype.albumRegular, .albumCloudShared] {
             var match: PHAssetCollection?
-            found.enumerateObjects { c, _, stop in
-                if c.localizedTitle == Self.preferredAlbum { match = c; stop.pointee = true; return }
-                let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
-                if subtype == .albumCloudShared, n > (best?.1 ?? 0) { best = (c, n) }
-            }
+            PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
+                .enumerateObjects { c, _, stop in
+                    if c.localizedTitle == Self.preferredAlbum { match = c; stop.pointee = true }
+                }
             if let match { return match }
         }
+        // Otherwise the largest shared album.
+        var best: (PHAssetCollection, Int)?
+        PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
+            .enumerateObjects { c, _, _ in
+                let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
+                if n > (best?.1 ?? 0) { best = (c, n) }
+            }
         return best?.0
     }
 

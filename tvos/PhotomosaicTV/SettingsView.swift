@@ -16,11 +16,17 @@ struct SettingsView: View {
                 Section("Photos") {
                     Picker("Album", selection: $settings.albumID) {
                         if !albums.contains(where: { $0.id == settings.albumID }) {
-                            Text(currentAlbum).tag(settings.albumID)
+                            Text("\(currentAlbum) (playing now)").tag(settings.albumID)
                         }
-                        ForEach(albums) { album in
-                            Text("\(album.title) · \(album.count)\(album.shared ? " · shared" : "")")
-                                .tag(album.id)
+                        Section("Shared albums") {
+                            ForEach(albums.filter(\.shared)) { album in
+                                Text("\(album.title) · \(album.count)").tag(album.id)
+                            }
+                        }
+                        Section("My albums") {
+                            ForEach(albums.filter { !$0.shared }) { album in
+                                Text("\(album.title) · \(album.count)").tag(album.id)
+                            }
                         }
                     }
                 }

@@ -17,7 +17,8 @@ final class AppSettings: ObservableObject {
     @Published var tint: Int { didSet { store.set(tint, forKey: "tint") } }
     /// Photo caption: "off", "date" or "place" (date and place).
     @Published var caption: String { didSet { store.set(caption, forKey: "caption") } }
-    /// PhotoKit album identifier; empty = "Nature", else the largest shared album.
+    /// PhotoKit album identifier; empty = the album named PhotoLibrary.preferredAlbum
+    /// ("Portfolio", library album before shared), else the largest shared album.
     @Published var albumID: String { didSet { store.set(albumID, forKey: "albumID") } }
 
     static let grids = [60, 80, 100, 120, 150]
@@ -33,5 +34,12 @@ final class AppSettings: ObservableObject {
         tint = store.object(forKey: "tint") as? Int ?? 20
         albumID = store.string(forKey: "albumID") ?? ""
         caption = store.string(forKey: "caption") ?? "place"
+
+        // The default album changed from "Nature" to the library album "Portfolio" (v0.6.3):
+        // forget an album picked under the old default once, so the new default takes effect.
+        if store.integer(forKey: "defaultAlbumVersion") < 3 {
+            albumID = ""
+            store.set(3, forKey: "defaultAlbumVersion")
+        }
     }
 }

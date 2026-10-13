@@ -45,8 +45,8 @@ in/out/alternate). All 64 px micros live in one texture atlas (4096² holds ~6,0
 far-zoom phase is a single instanced draw; 320 px and full-size versions are separate textures
 requested from PhotoKit as tiles grow, in LRU caches like the web player. 4K output (3840×2160).
 
-**Settings:** direction, grid size, zoom duration, pause, colour blend — stored in `UserDefaults`.
-Album picker on first launch.
+**Settings:** album, direction, grid size, zoom duration, pause, colour blend, photo caption —
+stored in `UserDefaults`. The album picker lists albums with 100+ photos, shared and library groups A–Z.
 
 ## Milestones
 
@@ -65,10 +65,17 @@ Album picker on first launch.
 ## Photo captions (v0.6.0)
 
 `Captions.swift`: date from `PHAsset.creationDate`; place from `PHAsset.location`, reverse-geocoded
-with `CLGeocoder` (one request at a time, cached per photo). The player shows the caption only during
-the pause (`u == 0`) and prefetches the next photo's place when a cycle starts. Many shared-album
-photos carry no location (about 1 in 10 of the exported Nature files had GPS), so those show the date
-only; the settings screen reports the album's actual count.
+with `CLGeocoder` — one request at a time, shared by photos within ~1 km (coordinates rounded to two
+decimals), retried on failure, and only real answers cached (v0.6.3). Where there's no town, the
+park or natural feature is used. The player shows the caption only during the pause (`u == 0`) and
+prefetches the next photo's place when a cycle starts.
+
+Photos without coordinates show the date only. The old shared Nature album had GPS in just 36% of
+photos — mostly cameras without GPS, plus some days whose locations were dropped when the photos
+were shared. Shared albums also store reduced (~2048 px) copies, so v0.6.3 makes the **library**
+album "Portfolio" the default (full resolution, locations kept); a shared album of the same name is
+the fallback. A brand-new shared album can take a long time to appear on the Apple TV (one never
+arrived while it had no other participants), which is another reason to prefer a library album.
 
 ## Building & installing (no Xcode clicks needed)
 
