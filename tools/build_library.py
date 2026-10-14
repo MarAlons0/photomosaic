@@ -16,6 +16,11 @@ wrapper does — and still analyse colours without browser cross-origin errors.
 Re-running is incremental: photos already processed are skipped, and photos no
 longer in the source folder are dropped from the manifest (and deleted with --prune).
 
+Captions: each photo's date and GPS position are read from its EXIF data. On a Mac,
+positions are turned into place names with Apple's map service (tools/geocode.swift),
+one lookup per ~1 km area, cached in places.json so later builds only look up new
+areas. Use --no-places to skip the lookups (captions then show dates only).
+
 Usage:
     python3 tools/build_library.py ~/Pictures/MosaicExport
     python3 tools/build_library.py ~/Pictures/NatureExport --out library-nature --prune
@@ -26,13 +31,14 @@ or export JPEGs from Photos instead.
 """
 import argparse
 import base64
+import subprocess
 import hashlib
 import io
 import json
 import os
 import random
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 try:
     from PIL import Image, ImageOps
@@ -52,6 +58,7 @@ if HEIF:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_NAME = "index.json"
+PLACES_NAME = "places.json"
 
 
 def photo_id(path):
@@ -98,6 +105,71 @@ def process(path, pid, out, full_px, mid_px, tiny_px):
     }
 
 
+def read_meta(path):
+    """(date "YYYY-MM-DD" or None, (lat, lon) or None) from a photo's EXIF data."""
+    try:
+        with Image.open(path) as im:
+            ex = im.getexif()
+            taken = ex.get_ifd(0x8769).get(36867) or ex.get(306)
+            date = taken[:10].replace(":", "-") if taken and taken[:4].isdigit() else None
+            g = ex.get_ifd(0x8825)
+            pos = None
+            if 2 in g and 4 in g:
+                dms = lambda v: float(v[0]) + float(v[1]) / 60 + float(v[2]) / 3600
+                lat = dms(g[2]) * (-1 if g.get(1) == "S" else 1)
+                lon = dms(g[4]) * (-1 if g.get(3) == "W" else 1)
+                if abs(lat) > 0.0001 or abs(lon) > 0.0001:   # 0,0 = no real fix
+                    pos = (lat, lon)
+            return date, pos
+    except Exception:
+        return None, None
+
+
+def tidy(place):
+    """Same rule as the helper, for names cached before it: "Singapore, SG, Singapore" -> "Singapore"."""
+    parts = [x.strip() for x in place.split(",")]
+    return parts[0] if len(parts) > 1 and parts[0] == parts[-1] else place
+
+
+def area_key(pos):
+    """Photos within roughly a kilometre share one place lookup (same rule as the Apple TV app)."""
+    return f"{pos[0]:.2f},{pos[1]:.2f}"
+
+
+def look_up_places(keys, places, places_path):
+    """Fill `places` for `keys` using tools/geocode.swift; saves progress as it goes."""
+    if sys.platform != "darwin":
+        print("Place names need macOS (Apple's map service); captions will show dates only.")
+        return
+    helper = os.path.join(ROOT, "tools", "geocode.swift")
+    print(f"Looking up {len(keys)} places (Apple limits the rate: about {len(keys) * 1.5 / 60:.0f}+ min)…")
+    try:
+        proc = subprocess.Popen(["swift", "-suppress-warnings", helper], stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    except FileNotFoundError:
+        print("Swift isn't installed (comes with Xcode); captions will show dates only.")
+        return
+    for k in keys:
+        lat, lon = map(float, k.split(","))
+        proc.stdin.write(f"{k}\t{lat}\t{lon}\n")
+    proc.stdin.close()
+    done = failed = 0
+    for line in proc.stdout:
+        key, _, name = line.rstrip("\n").partition("\t")
+        done += 1
+        if name == "!":
+            failed += 1                      # not cached: retried on the next build
+        else:
+            places[key] = name
+        if done % 25 == 0 or done == len(keys):
+            print(f"  {done}/{len(keys)}", flush=True)
+            with open(places_path, "w") as f:
+                json.dump(places, f, ensure_ascii=False, indent=0)
+    proc.wait()
+    if failed:
+        print(f"{failed} places couldn't be looked up; run the build again later to retry them.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source", help="folder of photos (searched recursively)")
@@ -111,6 +183,8 @@ def main():
     ap.add_argument("--tiny", type=int, default=128, help="long edge of inline thumbnails (default 128)")
     ap.add_argument("--prune", action="store_true", help="delete files for photos no longer in the source")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
+    ap.add_argument("--no-places", action="store_true",
+                    help="don't look up place names (captions show dates only)")
     args = ap.parse_args()
 
     src = os.path.expanduser(args.source)
@@ -178,13 +252,40 @@ def main():
     with open(cache_path, "w") as f:
         json.dump(entries, f)
 
-    photos = [{k: v for k, v in e.items() if k != "id"} for e in entries.values()]
+    # Captions: date and place for every photo (read fresh each build; EXIF only, no decoding).
+    ids = list(entries)
+    with ThreadPoolExecutor(16) as ex:
+        meta = dict(zip(ids, ex.map(lambda pid: read_meta(wanted[pid]), ids)))
+    places_path = os.path.join(out, PLACES_NAME)
+    try:
+        with open(places_path) as f:
+            places = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        places = {}
+    needed = sorted({area_key(pos) for _, pos in meta.values() if pos} - set(places))
+    if needed and not args.no_places:
+        look_up_places(needed, places, places_path)
+    with open(places_path, "w") as f:
+        json.dump(places, f, ensure_ascii=False, indent=0)
+
+    photos = []
+    for pid, e in entries.items():
+        p = {k: v for k, v in e.items() if k != "id"}
+        date, pos = meta[pid]
+        if date:
+            p["d"] = date
+        if pos and places.get(area_key(pos)):
+            p["p"] = tidy(places[area_key(pos)])
+        photos.append(p)
+    dated = sum("d" in p for p in photos)
+    placed = sum("p" in p for p in photos)
+    print(f"Captions: {dated} photos with a date, {placed} with a place name.")
     rel = os.path.relpath(out, ROOT).replace(os.sep, "/")
     manifest = {"version": 1, "base": rel.rstrip("/") + "/", "photos": photos}
     with open(os.path.join(out, "manifest.js"), "w") as f:
         f.write("// Generated by tools/build_library.py — do not edit.\n")
         f.write("window.PHOTO_MANIFEST = ")
-        json.dump(manifest, f, separators=(",", ":"))
+        json.dump(manifest, f, separators=(",", ":"), ensure_ascii=False)
         f.write(";\n")
 
     size = os.path.getsize(os.path.join(out, "manifest.js")) / 1e6

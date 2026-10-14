@@ -86,6 +86,8 @@
       this.elapsed = 0;
       this.cycle = null;
       this.running = false;
+      this.onCaption = null;       // called with the photo filling the screen during a pause, or null
+      this.captionPhoto = null;
       this._frame = this._frame.bind(this);
       this.resize();
     }
@@ -404,6 +406,12 @@
         const u = (this.elapsed - hold) / duration;
         if (u >= 1) this.beginCycle(this.cycle.end);
         else p = easeInOut(u);
+      }
+      // Caption while a photo fills the screen (the pause), hidden while zooming.
+      const showing = this.elapsed <= hold && hold > 0 ? this.cycle.shown : null;
+      if (showing !== this.captionPhoto) {
+        this.captionPhoto = showing;
+        if (this.onCaption) this.onCaption(showing == null ? null : this.photos[showing]);
       }
       this.draw(this.cycle.dir === 'out' ? 1 - p : p);
       requestAnimationFrame(this._frame);

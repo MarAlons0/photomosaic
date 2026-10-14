@@ -43,6 +43,11 @@ pre-build a library once:
 
 HEIC exports need `pip3 install pillow-heif`; exporting as JPEG avoids that.
 
+**Captions.** The build also reads each photo's date and GPS position and, on a Mac, looks up place
+names with Apple's map service (one lookup per ~1 km area, cached in `library/places.json`). Export
+with *Location Information* ticked so the files keep their GPS. The first build of a large album can
+take ~15 minutes for the lookups; later builds only look up new areas. `--no-places` skips them.
+
 ### Several libraries
 
 Build each into its own folder and pick one with `?lib=`:

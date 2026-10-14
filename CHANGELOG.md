@@ -4,6 +4,15 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.7.0] – 2026-10-13
+### Added
+- **Photo captions in the browser player**: while a photo fills the screen during the pause, its date and place fade in at the bottom left (e.g. *August 20, 2017 · Cincinnati, OH*), as on the Apple TV. New *Photo caption* setting (Off / Date / Date & place) in the settings panel, or `?caption=off|date|place`.
+- `build_library.py` reads each photo's date and GPS position from its EXIF data and looks up place names with Apple's map service via the new `tools/geocode.swift` helper (macOS; same naming rules as the Apple TV). One lookup per ~1 km area, cached in `library/places.json`, so later builds only look up new areas; `--no-places` skips them. Portfolio: 3,624 photos dated, 3,528 placed, from 518 lookups.
+
+### Changed
+- The default Mac library is now built from the **Portfolio** album (full-resolution export).
+- City-states read as one name ("Singapore", not "Singapore, SG, Singapore") — browser and Apple TV.
+
 ## [0.6.3] – 2026-10-13
 ### Changed
 - Apple TV: the default album is now **Portfolio**, preferring the library album (full resolution, locations kept) over a shared one of the same name. An album picked under the old default ("Nature") is forgotten once so the new default takes effect.

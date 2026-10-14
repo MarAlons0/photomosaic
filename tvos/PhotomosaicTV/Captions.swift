@@ -91,6 +91,8 @@ final class Captions {
     private static func describe(_ p: CLPlacemark) -> String {
         let spot = p.locality ?? p.areasOfInterest?.first ?? p.subLocality ?? p.inlandWater
             ?? p.ocean ?? p.subAdministrativeArea ?? p.name
+        // A city-state (Singapore, Monaco) is just its name, not "Singapore, SG, Singapore".
+        if let spot, spot == p.country { return spot }
         var parts = [spot, p.administrativeArea].compactMap { $0 }
         if parts.count == 2 && parts[0] == parts[1] { parts.removeLast() }
         if let country = p.country, p.isoCountryCode != Locale.current.region?.identifier {

@@ -6,6 +6,7 @@
  *     micro,     64 px canvas, always in memory: tile features, far-zoom drawing, fallback
  *     levels,    loaded versions [{src, w, h, crop, kind, tainted}], smallest first;
  *                starts as [micro] and is managed by the player's cache
+ *     date, place  caption data, when the library has it (built libraries only)
  *     load: {    on-demand versions, each -> Promise<{src, tainted}>
  *       tiny(),        ~128 px
  *       mid(),         ~320 px
@@ -200,7 +201,7 @@
       const photos = [];
       await pool(manifest.photos, 8, async e => {
         const micro = await microOf(await loadImg(e.t));  // data: URI, so safe to read pixels from
-        photos.push(makePhoto(e.n, micro, {
+        const photo = makePhoto(e.n, micro, {
           async tiny() { return clean(await loadImg(e.t)); },
           async mid() { return { src: await loadImg(base + e.m), tainted: fromDisk }; },
           async hires() {
@@ -211,7 +212,10 @@
             try { src = await createImageBitmap(img); } catch (err) { /* keep the <img> */ }
             return { src, tainted: fromDisk };
           },
-        }));
+        });
+        photo.date = e.d;    // "YYYY-MM-DD", from the photo's EXIF
+        photo.place = e.p;   // e.g. "Yellowstone National Park, WY"
+        photos.push(photo);
       }, onProgress);
       return photos.slice();   // late finishers (after a pool timeout) must not join later
     },

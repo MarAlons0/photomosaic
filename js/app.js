@@ -4,6 +4,7 @@
  * URL parameters (handy for screen-saver use):
  *   ?grid=60&duration=22&hold=3&tint=0.2&spacing=3   override settings
  *   ?direction=in|out|alternate                     zoom direction
+ *   ?caption=off|date|place                         photo caption
  *   ?demo=1      start straight away with demo scenes
  *   ?saver=1     never show the intro; use the built library, else the demo
  *   ?lib=NAME    use the library built into folder NAME (default: library)
@@ -11,10 +12,11 @@
 (function (PM) {
   'use strict';
 
-  PM.VERSION = '0.6.3'; // keep in sync with VERSION and the ?v= on index.html's script tags
+  PM.VERSION = '0.7.0'; // keep in sync with VERSION and the ?v= on index.html's script tags
 
-  const DEFAULTS = { direction: 'in', grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
+  const DEFAULTS = { direction: 'in', caption: 'place', grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
   const DIRECTIONS = ['in', 'out', 'alternate'];
+  const CAPTIONS = ['off', 'date', 'place'];
   const RANGES = {
     grid: [20, 200, 10],
     duration: [6, 90, 1],
@@ -36,6 +38,8 @@
   }
   if (params.has('direction')) settings.direction = params.get('direction');
   if (!DIRECTIONS.includes(settings.direction)) settings.direction = DEFAULTS.direction;
+  if (params.has('caption')) settings.caption = params.get('caption');
+  if (!CAPTIONS.includes(settings.caption)) settings.caption = DEFAULTS.caption;
   const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ } };
 
   const $ = sel => document.querySelector(sel);
@@ -65,6 +69,7 @@
       await new Promise(r => setTimeout(r, 30));
       if (player) player.stop();
       player = PM.player = new PM.Player(canvas, photos, settings);
+      player.onCaption = showCaption;
       await player.start();
       intro.hidden = true;
       setProgress('');
@@ -143,6 +148,27 @@
     if (k === 'grid' || k === 'spacing') input.onchange = () => player && player.restart();
   }
   // Direction applies from the next photo, so the current zoom isn't interrupted.
+  // Photo caption: date (and place) of the photo filling the screen during the pause.
+  const captionEl = $('#photo-caption');
+  const dateFormat = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  function showCaption(photo) {
+    let text = '';
+    if (photo && settings.caption !== 'off') {
+      const date = photo.date ? dateFormat.format(new Date(photo.date + 'T12:00:00')) : '';
+      const place = settings.caption === 'place' ? photo.place || '' : '';
+      text = [date, place].filter(Boolean).join('  ·  ');
+    }
+    if (text) captionEl.textContent = text;   // keep the old text while fading out
+    captionEl.classList.toggle('show', !!text);
+  }
+  const captionSelect = $('#set-caption');
+  captionSelect.value = settings.caption;
+  captionSelect.onchange = () => {
+    settings.caption = captionSelect.value;
+    save();
+    if (player && player.captionPhoto != null) showCaption(player.photos[player.captionPhoto]);
+  };
+
   const dirSelect = $('#set-direction');
   dirSelect.value = settings.direction;
   dirSelect.onchange = () => { settings.direction = dirSelect.value; save(); };
@@ -150,6 +176,7 @@
   $('#reset').onclick = () => {
     Object.assign(settings, DEFAULTS);
     dirSelect.value = settings.direction;
+    captionSelect.value = settings.caption;
     for (const k of Object.keys(RANGES)) { $(`#set-${k}`).value = settings[k]; $(`#val-${k}`).textContent = fmt[k](settings[k]); }
     save();
     if (player) player.restart();
