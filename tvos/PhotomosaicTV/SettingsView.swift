@@ -14,19 +14,14 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Photos") {
-                    Picker("Album", selection: $settings.albumID) {
-                        if !albums.contains(where: { $0.id == settings.albumID }) {
-                            Text("\(currentAlbum) (playing now)").tag(settings.albumID)
-                        }
-                        Section("Shared albums") {
-                            ForEach(albums.filter(\.shared)) { album in
-                                Text("\(album.title) · \(album.count)").tag(album.id)
-                            }
-                        }
-                        Section("My albums") {
-                            ForEach(albums.filter { !$0.shared }) { album in
-                                Text("\(album.title) · \(album.count)").tag(album.id)
-                            }
+                    NavigationLink {
+                        AlbumList(settings: settings, albums: albums, currentAlbum: currentAlbum)
+                    } label: {
+                        HStack {
+                            Text("Album")
+                            Spacer()
+                            Text(albums.first { $0.id == settings.albumID }?.title ?? currentAlbum)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -64,6 +59,51 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Photomosaic")
+        }
+    }
+}
+
+/// Album chooser: every album is a plain button (pickers with grouped entries don't take
+/// focus reliably on tvOS). Choosing one goes back to the settings screen.
+private struct AlbumList: View {
+    @ObservedObject var settings: AppSettings
+    let albums: [PhotoLibrary.AlbumChoice]
+    let currentAlbum: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            if !albums.contains(where: { $0.id == settings.albumID }) {
+                Section("Playing now") {
+                    row(title: currentAlbum, count: nil, id: settings.albumID)
+                }
+            }
+            let shared = albums.filter(\.shared), mine = albums.filter { !$0.shared }
+            if !shared.isEmpty {
+                Section("Shared albums") {
+                    ForEach(shared) { row(title: $0.title, count: $0.count, id: $0.id) }
+                }
+            }
+            if !mine.isEmpty {
+                Section("My albums") {
+                    ForEach(mine) { row(title: $0.title, count: $0.count, id: $0.id) }
+                }
+            }
+        }
+        .navigationTitle("Album")
+    }
+
+    private func row(title: String, count: Int?, id: String) -> some View {
+        Button {
+            settings.albumID = id
+            dismiss()
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                if let count { Text("\(count)").foregroundStyle(.secondary) }
+                if id == settings.albumID { Image(systemName: "checkmark") }
+            }
         }
     }
 }

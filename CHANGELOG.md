@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.7.1] – 2026-10-17
+### Fixed
+- Apple TV: albums couldn't be selected in Settings → Album — tvOS 27 greys out entries grouped inside a picker. The album chooser is now its own screen of plain buttons (Shared albums, My albums, a ✓ on the album playing).
+
 ## [0.7.0] – 2026-10-13
 ### Added
 - **Photo captions in the browser player**: while a photo fills the screen during the pause, its date and place fade in at the bottom left (e.g. *August 20, 2017 · Cincinnati, OH*), as on the Apple TV. New *Photo caption* setting (Off / Date / Date & place) in the settings panel, or `?caption=off|date|place`.
