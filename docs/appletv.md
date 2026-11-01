@@ -94,7 +94,15 @@ expires. To renew, move the old profile out of
 "tvOS Team Provisioning Profile: com.marioalonso.PhotomosaicTV"), rebuild with
 `-allowProvisioningUpdates` so a fresh 7-day profile is fetched, and install again. Check with
 `security cms -D -i <App>.app/embedded.mobileprovision | plutil -extract ExpirationDate raw -o - -`.
-The Mac must be on the same network as the Apple TV; the TV can be asleep. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
+The Mac must be on the same network as the Apple TV; the TV can be asleep.
+
+**Automatic renewal:** [`tvos/reinstall.sh`](../tvos/reinstall.sh) does all of the above and logs to
+`~/Library/Logs/Photomosaic-reinstall.log`. A LaunchAgent
+(`~/Library/LaunchAgents/com.marioalonso.photomosaic.reinstall.plist`) runs a copy of it from
+`~/Library/Application Support/Photomosaic/` on Mondays and Thursdays at 04:00 (a run missed while
+the Mac sleeps happens on wake). Background jobs can't read `~/Documents`, so the script builds from
+its own clone of the GitHub repo in `~/Library/Caches/PhotomosaicTV-build` — renewals install the
+latest pushed code. The script's header has the commands to remove the schedule. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
 uses a folder-synchronised group, so any `.swift` file added to `tvos/PhotomosaicTV/` is built.
 
 ## Repo layout
