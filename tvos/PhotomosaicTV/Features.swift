@@ -31,15 +31,17 @@ enum Features {
         out[2] = 200 * (fy - fz)
     }
 
-    /// Centred "aspect fill" crop of a w x h image to `aspect` (width / height), in pixels.
-    static func cover(width w: Int, height h: Int, aspect: CGFloat) -> CGRect {
+    /// "Aspect fill" crop of a w x h image to `aspect` (width / height), in pixels (top-left
+    /// origin). `position` places it along the trimmed axis: 0 = top / left, 0.5 = centred,
+    /// 1 = bottom / right (see Framing).
+    static func cover(width w: Int, height h: Int, aspect: CGFloat, position t: CGFloat = 0.5) -> CGRect {
         let W = CGFloat(w), H = CGFloat(h)
         if W / H > aspect {
             let sw = H * aspect
-            return CGRect(x: (W - sw) / 2, y: 0, width: sw, height: H).integral
+            return CGRect(x: (W - sw) * t, y: 0, width: sw, height: H).integral
         }
         let sh = W / aspect
-        return CGRect(x: 0, y: (H - sh) / 2, width: W, height: sh).integral
+        return CGRect(x: 0, y: (H - sh) * t, width: W, height: sh).integral
     }
 
     /// Features of an n x n grid laid over `crop` of `image`: n*n*12 floats, row-major

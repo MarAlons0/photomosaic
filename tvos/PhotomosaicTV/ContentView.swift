@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var player: Player?
     @State private var showSettings = false
     @State private var albums: [PhotoLibrary.AlbumChoice] = []
-    @State private var before: (album: String, direction: String, grid: Int)?
+    @State private var before: (album: String, direction: String, grid: Int, framing: String)?
     @State private var wasPaused = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -40,6 +40,7 @@ struct ContentView: View {
         }
         .onAppear {
             keepAwake()
+            library.smartFraming = settings.framing == "smart"
             library.start(aspect: aspect, albumID: settings.albumID)
         }
         // tvOS can drop the "no screen saver" request (e.g. when the app returns to the
@@ -67,7 +68,7 @@ struct ContentView: View {
 
     private func openSettings() {
         albums = library.albumChoices()
-        before = (settings.albumID, settings.direction, settings.grid)
+        before = (settings.albumID, settings.direction, settings.grid, settings.framing)
         wasPaused = player?.paused ?? false
         player?.paused = true
         showSettings = true
@@ -78,6 +79,15 @@ struct ContentView: View {
         if settings.albumID != before.album {
             player = nil                       // a new player starts once the album has loaded
             library.start(aspect: aspect, albumID: settings.albumID)
+            return
+        }
+        if settings.framing != before.framing {
+            // Every crop changes: start a fresh player (it rebuilds the tile atlas).
+            library.smartFraming = settings.framing == "smart"
+            library.refreshFeatures()
+            let p = Player(library: library, settings: settings)
+            player = p
+            Task { await p.start() }
             return
         }
         player?.paused = wasPaused

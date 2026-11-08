@@ -32,6 +32,8 @@ PROFILES="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 APP="$WORK/dd/Build/Products/Release-appletvos/PhotomosaicTV.app"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S')  $*"; }
+# A Mac notification, so a failed renewal is noticed before the app expires.
+notify() { osascript -e "display notification \"$1\" with title \"Photomosaic renewal failed\"" 2>/dev/null; }
 mkdir -p "$WORK/old-profiles"
 
 # 1. The Apple TV must be reachable; otherwise leave everything as it is.
@@ -63,6 +65,11 @@ if ! xcodebuild -project "$WORK/src/tvos/PhotomosaicTV.xcodeproj" -scheme Photom
      -allowProvisioningUpdates -allowProvisioningDeviceRegistration build > "$WORK/build.log" 2>&1; then
   for m in "${moved[@]}"; do mv "$WORK/old-profiles/$m" "$PROFILES/"; done   # put the old one back
   log "Build failed — is Xcode still signed in to your Apple ID? Details: $WORK/build.log"
+  if grep -q "No Accounts" "$WORK/build.log"; then
+    notify "Xcode is signed out of your Apple ID. Sign in (Xcode → Settings → Apple Accounts), then run tvos/reinstall.sh."
+  else
+    notify "The Apple TV build failed. See ~/Library/Logs/Photomosaic-reinstall.log."
+  fi
   grep -m3 "error:" "$WORK/build.log" | sed 's/^/    /'
   exit 1
 fi
@@ -71,6 +78,7 @@ expires=$(security cms -D -i "$APP/embedded.mobileprovision" | plutil -extract E
 # 5. Install (this closes the app if it's running).
 if ! xcrun devicectl device install app --device "$DEVICE" "$APP" > "$WORK/install.log" 2>&1; then
   log "Install failed. Details: $WORK/install.log"
+  notify "Couldn't install on the Apple TV. See ~/Library/Logs/Photomosaic-reinstall.log."
   exit 1
 fi
 version=$(xcrun devicectl device info apps --device "$DEVICE" --bundle-id "$BUNDLE" 2>/dev/null | tail -1 | awk '{print $3}')

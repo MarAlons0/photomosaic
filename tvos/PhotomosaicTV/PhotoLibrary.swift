@@ -30,6 +30,15 @@ final class PhotoLibrary: ObservableObject {
     private(set) var aspect: CGFloat = 16.0 / 9.0
     private var loaded = 0
 
+    /// Smart framing on (settings): photos use their saved crop position, else the centre.
+    var smartFraming = true
+    /// Crop position per photo (see Framing); 0.5 = centred, also until a photo is framed.
+    private var positions: [CGFloat] = []
+    /// Positions found so far, by asset identifier — saved, so each photo is framed once.
+    private var framed: [String: Double] = [:]
+    private static let framingFile = FileManager.default
+        .urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("framing-v2.json")
+
     private var generation = 0
 
     /// Load album `albumID` ("" = the preferred album, else the largest shared album).
@@ -115,6 +124,11 @@ final class PhotoLibrary: ObservableObject {
         fetched.enumerateObjects { a, _, _ in list.append(a) }
         guard list.count > 1 else { phase = .noAlbum; return }
         assets = list
+        if framed.isEmpty, let data = try? Data(contentsOf: Self.framingFile),
+           let saved = try? JSONDecoder().decode([String: Double].self, from: data) {
+            framed = saved
+        }
+        positions = list.map { CGFloat(framed[$0.localIdentifier] ?? 0.5) }
         micros = Array(repeating: nil, count: list.count)
         features = Array(repeating: 0, count: list.count * Features.count)
         phase = .loading(done: 0, total: list.count)
@@ -132,9 +146,7 @@ final class PhotoLibrary: ObservableObject {
                     guard gen == self.generation else { return }   // an older album's late reply
                     if let cg = image.flatMap(upright) {
                         self.micros[i] = cg
-                        let crop = Features.cover(width: cg.width, height: cg.height, aspect: self.aspect)
-                        let f = Features.grid(cg, crop: crop, n: 1, px: 8)
-                        for j in 0..<Features.count { self.features[i * Features.count + j] = f[j] }
+                        self.updateFeatures(i)
                     }
                     self.loaded += 1
                     if self.loaded == list.count {
@@ -147,21 +159,57 @@ final class PhotoLibrary: ObservableObject {
         }
     }
 
+    /// Crop position of photo i in effect now (0.5 = centred).
+    func position(_ i: Int) -> CGFloat { smartFraming ? positions[i] : 0.5 }
+
+    /// Whether photo i still needs Framing to find its subject.
+    func needsFraming(_ i: Int) -> Bool {
+        smartFraming && framed[assets[i].localIdentifier] == nil
+    }
+
+    /// Record photo i's crop position (and refresh its tile colours to match).
+    func setPosition(_ i: Int, _ t: CGFloat) {
+        positions[i] = t
+        framed[assets[i].localIdentifier] = Double(t)
+        updateFeatures(i)
+        if let data = try? JSONEncoder().encode(framed) {
+            try? data.write(to: Self.framingFile, options: .atomic)
+        }
+    }
+
+    /// Recompute every photo's tile colours (after smart framing is switched on or off).
+    func refreshFeatures() { for i in micros.indices { updateFeatures(i) } }
+
+    private func updateFeatures(_ i: Int) {
+        guard let cg = micros[i] else { return }
+        let crop = Features.cover(width: cg.width, height: cg.height, aspect: aspect, position: position(i))
+        let f = Features.grid(cg, crop: crop, n: 1, px: 8)
+        for j in 0..<Features.count { features[i * Features.count + j] = f[j] }
+    }
+
     /// How many of the album's photos carry a location (for captions).
     var locatedCount: Int { assets.reduce(0) { $0 + ($1.location == nil ? 0 : 1) } }
 
     /// Indices of photos whose micro loaded (only these can be tiles).
     var usable: [Int] { micros.indices.filter { micros[$0] != nil } }
 
-    /// A version of photo i big enough to fill `size` pixels.
+    /// The whole of photo i (uncropped, so smart framing can choose the crop), scaled to
+    /// cover `size` pixels. Very tall or wide photos are capped at the pixel count of a 3:2
+    /// photo covering `size`, keeping textures to a sensible memory size.
     func large(_ i: Int, size: CGSize) async -> CGImage? {
+        let asset = assets[i]
+        let pw = CGFloat(max(1, asset.pixelWidth)), ph = CGFloat(max(1, asset.pixelHeight))
+        var scale = max(size.width / pw, size.height / ph)
+        let cap = size.width * size.height * 4 / 3
+        if pw * ph * scale * scale > cap { scale = (cap / (pw * ph)).squareRoot() }
+        let target = CGSize(width: (pw * scale).rounded(), height: (ph * scale).rounded())
         let opts = PHImageRequestOptions()
         opts.isNetworkAccessAllowed = true
         opts.deliveryMode = .highQualityFormat
         opts.resizeMode = .exact
         return await withCheckedContinuation { cont in
-            PHImageManager.default().requestImage(for: assets[i], targetSize: size,
-                                                  contentMode: .aspectFill, options: opts) { image, _ in
+            PHImageManager.default().requestImage(for: asset, targetSize: target,
+                                                  contentMode: .aspectFit, options: opts) { image, _ in
                 cont.resume(returning: image.flatMap(upright))
             }
         }

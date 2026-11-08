@@ -28,17 +28,18 @@ enum TextureFactory {
         return tex
     }
 
-    static func generateMipmaps(_ tex: MTLTexture, queue: MTLCommandQueue) {
+    static func generateMipmaps(_ tex: MTLTexture, queue: MTLCommandQueue, wait: Bool = true) {
         guard tex.mipmapLevelCount > 1, let cb = queue.makeCommandBuffer(),
               let blit = cb.makeBlitCommandEncoder() else { return }
         blit.generateMipmaps(for: tex)
         blit.endEncoding()
         cb.commit()
-        cb.waitUntilCompleted()
+        if wait { cb.waitUntilCompleted() }
     }
 }
 
-/// Every photo's micro, cropped to 16:9, in fixed 96x54 slots of a texture array.
+/// Every photo's micro, cropped to 16:9 at its crop position, in fixed 96x54 slots of a
+/// texture array.
 struct Atlas {
     static let side = 4096
     static let slotW = 96, slotH = 54
@@ -47,7 +48,8 @@ struct Atlas {
 
     let texture: MTLTexture
 
-    static func build(micros: [CGImage?], aspect: CGFloat, device: MTLDevice, queue: MTLCommandQueue) -> Atlas? {
+    static func build(micros: [CGImage?], positions: [CGFloat], aspect: CGFloat,
+                      device: MTLDevice, queue: MTLCommandQueue) -> Atlas? {
         let pages = max(1, (micros.count + perPage - 1) / perPage)
         let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: side, height: side,
                                                             mipmapped: true)
@@ -68,7 +70,8 @@ struct Atlas {
                 for slot in 0..<perPage {
                     let i = page * perPage + slot
                     guard i < micros.count, let micro = micros[i] else { continue }
-                    let crop = Features.cover(width: micro.width, height: micro.height, aspect: aspect)
+                    let crop = Features.cover(width: micro.width, height: micro.height, aspect: aspect,
+                                              position: positions[i])
                     guard let tile = micro.cropping(to: crop) else { continue }
                     let col = slot % cols, row = slot / cols
                     // Core Graphics draws bottom-up; memory (and the texture) is top-down.
@@ -81,6 +84,28 @@ struct Atlas {
         }
         TextureFactory.generateMipmaps(tex, queue: queue)
         return Atlas(texture: tex)
+    }
+
+    /// Redraw photo i's slot at a new crop position (after Framing found its subject).
+    func update(_ i: Int, micro: CGImage, position: CGFloat, aspect: CGFloat, queue: MTLCommandQueue) {
+        let crop = Features.cover(width: micro.width, height: micro.height, aspect: aspect, position: position)
+        guard let tile = micro.cropping(to: crop) else { return }
+        let w = Self.slotW, h = Self.slotH
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
+            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                      bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+            ctx.interpolationQuality = .high
+            ctx.draw(tile, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard drawn else { return }
+        let page = i / Self.perPage, s = i % Self.perPage
+        texture.replace(region: MTLRegionMake2D((s % Self.cols) * w, (s / Self.cols) * h, w, h),
+                        mipmapLevel: 0, slice: page, withBytes: pixels,
+                        bytesPerRow: w * 4, bytesPerImage: w * h * 4)
+        TextureFactory.generateMipmaps(texture, queue: queue, wait: false)
     }
 
     /// Atlas page and UV rectangle for photo i (inset half a texel against bleeding).
@@ -97,9 +122,9 @@ struct PhotoTexture {
     let texture: MTLTexture
     let uv: SIMD4<Float>
 
-    init(_ texture: MTLTexture, aspect: CGFloat) {
+    init(_ texture: MTLTexture, aspect: CGFloat, position: CGFloat) {
         self.texture = texture
-        let c = Features.cover(width: texture.width, height: texture.height, aspect: aspect)
+        let c = Features.cover(width: texture.width, height: texture.height, aspect: aspect, position: position)
         let w = Float(texture.width), h = Float(texture.height)
         uv = SIMD4(Float(c.minX) / w, Float(c.minY) / h, Float(c.maxX) / w, Float(c.maxY) / h)
     }
@@ -115,7 +140,7 @@ final class TextureCache {
     static let caps: [Kind: Int] = [.mid: 700, .hires: 14]
 
     private struct Entry {
-        var texture: PhotoTexture?
+        var texture: MTLTexture?
         var lastUse: Int
     }
 
@@ -140,7 +165,8 @@ final class TextureCache {
         clock += 1
         e.lastUse = clock
         entries[kind]![i] = e
-        return e.texture
+        // The crop is applied here, so a photo framed after loading is drawn at its new position.
+        return e.texture.map { PhotoTexture($0, aspect: aspect, position: library.position(i)) }
     }
 
     /// Start loading photo i at this size unless it's loaded or loading.
@@ -168,7 +194,7 @@ final class TextureCache {
         }.value
         guard let tex else { return }
         clock += 1
-        entries[kind]![i] = Entry(texture: PhotoTexture(tex, aspect: aspect), lastUse: clock)
+        entries[kind]![i] = Entry(texture: tex, lastUse: clock)
         evict(kind)
     }
 

@@ -106,8 +106,9 @@ final class Player: NSObject, ObservableObject {
     func start() async {
         guard atlas == nil else { return }
         let micros = library.micros, device = device, queue = queue, aspect = aspect
+        let positions = library.micros.indices.map { library.position($0) }
         atlas = await Task.detached(priority: .userInitiated) {
-            Atlas.build(micros: micros, aspect: aspect, device: device, queue: queue)
+            Atlas.build(micros: micros, positions: positions, aspect: aspect, device: device, queue: queue)
         }.value
         cache = TextureCache(device: device, queue: queue, library: library, aspect: aspect)
 
@@ -131,15 +132,40 @@ final class Player: NSObject, ObservableObject {
         return image
     }
 
+    /// Plans a cycle. Every photo that will fill the screen in it is framed first (smart
+    /// framing), so its tile, its full-size version and its mosaic all use the same crop.
     private func makePlan(dir: Direction, mosaicPhoto: Int, shown: Int?) async -> CyclePlan {
         cache?.pinned.insert(mosaicPhoto)
-        let image = await fetchHires(mosaicPhoto) ?? library.micros[mosaicPhoto]!
+        let hires = await fetchHires(mosaicPhoto)
+        await frame(mosaicPhoto, image: hires)
+        let image = hires ?? library.micros[mosaicPhoto]!
+        if let shown { await frame(shown) }
         let n = settings.grid, features = library.features, pool = drawPool(excluding: mosaicPhoto)
-        let recentSet = Set(recent), aspect = aspect
-        return await Task.detached(priority: .userInitiated) {
+        let recentSet = Set(recent), aspect = aspect, position = library.position(mosaicPhoto)
+        let plan = await Task.detached(priority: .userInitiated) {
             Planner.plan(dir: dir, mosaicPhoto: mosaicPhoto, image: image, shown: shown, n: n,
-                         features: features, pool: pool, recent: recentSet, aspect: aspect)
+                         features: features, pool: pool, recent: recentSet, aspect: aspect,
+                         position: position)
         }.value
+        await frame(plan.end)   // zooming in, the target tile fills the screen next
+        return plan
+    }
+
+    /// Find photo i's subject and move its crop to keep it in view (once per photo).
+    private func frame(_ i: Int, image: CGImage? = nil) async {
+        guard library.needsFraming(i) else { return }
+        var source = image
+        if source == nil { source = await fetchHires(i) }
+        guard let source, library.needsFraming(i) else { return }
+        let aspect = aspect
+        let t = await Task.detached(priority: .userInitiated) {
+            Framing.position(of: source, aspect: aspect)
+        }.value
+        guard library.needsFraming(i) else { return }
+        library.setPosition(i, t)
+        if t != 0.5, let micro = library.micros[i] {
+            atlas?.update(i, micro: micro, position: t, aspect: aspect, queue: queue)
+        }
     }
 
     private func install(_ plan: CyclePlan) {

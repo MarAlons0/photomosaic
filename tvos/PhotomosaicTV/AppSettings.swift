@@ -17,6 +17,8 @@ final class AppSettings: ObservableObject {
     @Published var tint: Int { didSet { store.set(tint, forKey: "tint") } }
     /// Photo caption: "off", "date" or "place" (date and place).
     @Published var caption: String { didSet { store.set(caption, forKey: "caption") } }
+    /// Photo framing: "smart" (keep each photo's subject in the 16:9 crop) or "centre".
+    @Published var framing: String { didSet { store.set(framing, forKey: "framing") } }
     /// PhotoKit album identifier; empty = the album named PhotoLibrary.preferredAlbum
     /// ("Portfolio", library album before shared), else the largest shared album.
     @Published var albumID: String { didSet { store.set(albumID, forKey: "albumID") } }
@@ -34,6 +36,7 @@ final class AppSettings: ObservableObject {
         tint = store.object(forKey: "tint") as? Int ?? 20
         albumID = store.string(forKey: "albumID") ?? ""
         caption = store.string(forKey: "caption") ?? "place"
+        framing = store.string(forKey: "framing") ?? "smart"
 
         // The default album changed from "Nature" to the library album "Portfolio" (v0.6.3):
         // forget an album picked under the old default once, so the new default takes effect.

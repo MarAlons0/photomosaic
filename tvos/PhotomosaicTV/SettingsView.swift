@@ -26,6 +26,14 @@ struct SettingsView: View {
                     }
                 }
                 Section {
+                    Picker("Photo framing", selection: $settings.framing) {
+                        Text("Smart").tag("smart")
+                        Text("Centre").tag("centre")
+                    }
+                } footer: {
+                    Text("Photos are cropped to fit the screen. Smart moves the crop to keep each photo's subject in view; Centre always crops evenly.")
+                }
+                Section {
                     Picker("Photo caption", selection: $settings.caption) {
                         Text("Off").tag("off")
                         Text("Date").tag("date")

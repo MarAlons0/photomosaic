@@ -4,6 +4,13 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.8.0] – 2026-11-08
+### Added
+- **Smart framing (Apple TV)**: photos are cropped to the 16:9 screen, which trims the top and bottom of 3:2 and portrait shots. The crop now moves up or down just enough to keep each photo's subject in view: a bird near the top edge, a flower at the bottom. Subjects are found on the Apple TV with Apple's Vision framework (faces, where the eye goes, and whole objects, so a second animal or an owl's talons near the edge are kept too) when a photo is about to fill the screen. Its tile, mosaic and full-size version all use the same crop, and each photo is checked once (results kept between launches). New *Photo framing* setting: Smart / Centre.
+
+### Changed
+- `tvos/reinstall.sh` shows a Mac notification when an automatic renewal fails (e.g. Xcode signed out of the Apple ID), so it's noticed before the 7-day install expires.
+
 ## [0.7.1] – 2026-10-17
 ### Fixed
 - Apple TV: albums couldn't be selected in Settings → Album — tvOS 27 greys out entries grouped inside a picker. The album chooser is now its own screen of plain buttons (Shared albums, My albums, a ✓ on the album playing).

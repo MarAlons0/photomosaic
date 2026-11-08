@@ -29,8 +29,10 @@ enum Planner {
     /// - pool: photos allowed as tiles this cycle (dealt by the player's deck).
     /// - shown: for zoom-out, the photo to place as the starting tile.
     static func plan(dir: Direction, mosaicPhoto: Int, image: CGImage, shown: Int?, n: Int,
-                     features: [Float], pool: [Int], recent: Set<Int>, aspect: CGFloat) -> CyclePlan {
-        let crop = Features.cover(width: image.width, height: image.height, aspect: aspect)
+                     features: [Float], pool: [Int], recent: Set<Int>, aspect: CGFloat,
+                     position: CGFloat) -> CyclePlan {
+        let crop = Features.cover(width: image.width, height: image.height, aspect: aspect,
+                                  position: position)
         let cells = Features.grid(image, crop: crop, n: n, px: 2)
 
         var assign = Matcher.build(cells: cells, n: n, pool: pool, features: features,

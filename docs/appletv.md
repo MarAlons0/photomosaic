@@ -77,6 +77,26 @@ album "Portfolio" the default (full resolution, locations kept); a shared album 
 the fallback. A brand-new shared album can take a long time to appear on the Apple TV (one never
 arrived while it had no other participants), which is another reason to prefer a library album.
 
+## Smart framing (v0.8.0)
+
+Photos are cropped to 16:9, which trims ~1/6 of a 3:2 photo's height and much more of a portrait
+one. `Framing.swift` runs Vision's face detection, attention-based saliency and objectness-based
+saliency on the full-size photo and returns a crop **position** along the trimmed axis (0 = top/left, 0.5 = centre, 1 =
+bottom/right). The crop leaves the centre only as far as needed to keep the subject (3% margin)
+inside. What it keeps, best first: faces; attention ∪ objectness
+regions (attention alone often stops short — the second hippo along the bottom edge, an owl's
+talons); attention alone; else it centres on the strongest region. Most photos stay centred.
+
+Only photos that fill the screen are framed — the mosaic photo and the target tile, while the next
+cycle is planned — so it adds no loading time. The position applies to every version of the photo:
+its atlas slot is redrawn, the 480 px / full-size textures pick it up when drawn, and the planner
+crops the mosaic photo the same way, so a tile grows seamlessly into its full-screen photo. Results
+For this, the 480 px and full-size versions are requested **uncropped** (scaled to cover the
+screen; very tall photos capped at the pixel count of a 3:2 one): PhotoKit's exact-size aspect-fill
+requests come back already centre-cropped, which left nothing to move. Results
+are saved by asset identifier in `Caches/framing-v2.json` (purgeable; recomputed if lost). The
+*Photo framing* setting (Smart / Centre) restarts the player, which rebuilds the atlas.
+
 ## Building & installing (no Xcode clicks needed)
 
 ```bash
@@ -102,7 +122,9 @@ The Mac must be on the same network as the Apple TV; the TV can be asleep.
 `~/Library/Application Support/Photomosaic/` on Mondays and Thursdays at 04:00 (a run missed while
 the Mac sleeps happens on wake). Background jobs can't read `~/Documents`, so the script builds from
 its own clone of the GitHub repo in `~/Library/Caches/PhotomosaicTV-build` — renewals install the
-latest pushed code. The script's header has the commands to remove the schedule. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
+latest pushed code. The script's header has the commands to remove the schedule. When a renewal fails it posts a Mac
+notification. The usual cause is Xcode signing out of the Apple ID (it has happened twice): sign in
+again under Xcode → Settings → Apple Accounts and run the script by hand. The project file is hand-written (Xcode 27's new-project flow made a Mac app); it
 uses a folder-synchronised group, so any `.swift` file added to `tvos/PhotomosaicTV/` is built.
 
 ## Repo layout

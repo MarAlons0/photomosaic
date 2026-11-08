@@ -1,5 +1,5 @@
 # Photomosaic — Backlog
-_Last updated: 2026-10-13_
+_Last updated: 2026-11-08_
 
 ## 🔴 High
 - [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. The decode hang that produced the same blank page is fixed in v0.6.2 ([docs/decode-hang.md](docs/decode-hang.md)). `[chore]`
@@ -13,6 +13,7 @@ _Last updated: 2026-10-13_
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Smart framing** — crop follows each photo's subject (Apple TV, Vision saliency) — v0.8.0
 - [x] **Loading can hang at 0%** — decode() no longer blocks loading; per-photo pool timeout — v0.6.2
 - [x] **Photo caption (browser)** — dates and Apple place names baked in at build time — v0.7.0
 - [x] **Photo caption** — date and place while a photo fills the screen (Apple TV) — v0.6.0
