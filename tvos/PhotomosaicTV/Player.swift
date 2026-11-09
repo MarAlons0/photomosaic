@@ -122,6 +122,7 @@ final class Player: NSObject, ObservableObject {
         install(plan)
         status = ""
         running = true
+        Self.frameAll(self)
     }
 
     /// Fetch photo i at full size (kept in the cache for drawing) and return it for analysis.
@@ -152,19 +153,54 @@ final class Player: NSObject, ObservableObject {
     }
 
     /// Find photo i's subject and move its crop to keep it in view (once per photo).
+    /// Photos about to fill the screen are framed here, ahead of the background pass.
     private func frame(_ i: Int, image: CGImage? = nil) async {
         guard library.needsFraming(i) else { return }
+        let gen = library.generation
         var source = image
         if source == nil { source = await fetchHires(i) }
-        guard let source, library.needsFraming(i) else { return }
+        guard let source, gen == library.generation, library.needsFraming(i) else { return }
         let aspect = aspect
         let t = await Task.detached(priority: .userInitiated) {
             Framing.position(of: source, aspect: aspect)
         }.value
-        guard library.needsFraming(i) else { return }
+        guard gen == library.generation, library.needsFraming(i) else { return }
         library.setPosition(i, t)
         if t != 0.5, let micro = library.micros[i] {
-            atlas?.update(i, micro: micro, position: t, aspect: aspect, queue: queue)
+            atlas?.update([(i, micro, t)], aspect: aspect, queue: queue)
+        }
+    }
+
+    /// Frame every photo of the album in the background — tiles grow large mid-zoom too.
+    /// Uses the 480 px versions, one photo at a time; atlas slots are refreshed and the
+    /// results saved every few seconds. Runs once per photo (results are kept), and stops
+    /// when this player is replaced or the album changes.
+    private static func frameAll(_ player: Player) {
+        let todo = player.library.usable.shuffled()
+        let gen = player.library.generation
+        Task { @MainActor [weak player] in
+            var batch: [(Int, CGImage, CGFloat)] = []
+            var lastFlush = CACurrentMediaTime()
+            @MainActor func flush(_ p: Player) {
+                p.atlas?.update(batch, aspect: p.aspect, queue: p.queue)
+                p.library.saveFraming()
+                batch.removeAll()
+                lastFlush = CACurrentMediaTime()
+            }
+            for i in todo {
+                guard let p = player, gen == p.library.generation else { return }
+                guard p.library.needsFraming(i) else { continue }
+                let library = p.library, aspect = p.aspect
+                guard let image = await library.large(i, size: TextureCache.sizes[.mid]!) else { continue }
+                let t = await Task.detached(priority: .utility) {
+                    Framing.position(of: image, aspect: aspect)
+                }.value
+                guard let p = player, gen == p.library.generation, p.library.needsFraming(i) else { continue }
+                p.library.setPosition(i, t, save: false)
+                if t != 0.5, let micro = p.library.micros[i] { batch.append((i, micro, t)) }
+                if CACurrentMediaTime() - lastFlush > 3 { flush(p) }
+            }
+            if let p = player { flush(p) }
         }
     }
 

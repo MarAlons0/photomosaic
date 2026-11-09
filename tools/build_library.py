@@ -21,6 +21,11 @@ positions are turned into place names with Apple's map service (tools/geocode.sw
 one lookup per ~1 km area, cached in places.json so later builds only look up new
 areas. Use --no-places to skip the lookups (captions then show dates only).
 
+Smart framing: on a Mac, each photo's subject regions are found with Apple's Vision
+framework (tools/framing.swift) and stored in the manifest, so the player can move each
+photo's crop to keep its subject on screen, whatever the screen's shape. Done once per
+photo (cached in index.json); --no-framing skips it (photos are then cropped centred).
+
 Usage:
     python3 tools/build_library.py ~/Pictures/MosaicExport
     python3 tools/build_library.py ~/Pictures/NatureExport --out library-nature --prune
@@ -170,6 +175,41 @@ def look_up_places(keys, places, places_path):
         print(f"{failed} places couldn't be looked up; run the build again later to retry them.")
 
 
+def find_subjects(todo, out, jobs):
+    """Add each entry's subject regions ("s", see tools/framing.swift) in place."""
+    if sys.platform != "darwin":
+        print("Smart framing needs macOS (Apple's Vision framework); photos will be cropped centred.")
+        return
+    helper = os.path.join(ROOT, "tools", "framing.swift")
+    print(f"Finding the subject of {len(todo)} photos…")
+    chunks = [todo[i::jobs] for i in range(jobs)]
+    done = [0]
+
+    def run(chunk):
+        try:
+            proc = subprocess.Popen(["swift", "-suppress-warnings", helper], stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        except FileNotFoundError:
+            return False
+        by_id = {e["id"]: e for e in chunk}
+        proc.stdin.write("".join(f"{e['id']}\t{os.path.join(out, e['f'])}\n" for e in chunk))
+        proc.stdin.close()
+        for line in proc.stdout:
+            pid, _, found = line.rstrip("\n").partition("\t")
+            if pid in by_id and found != "!":
+                boxes = json.loads(found)
+                by_id[pid]["s"] = boxes if any(boxes) else None   # None: looked, nothing stands out
+            done[0] += 1
+            if done[0] % 250 == 0:
+                print(f"  {done[0]}/{len(todo)}", flush=True)
+        proc.wait()
+        return True
+
+    with ThreadPoolExecutor(jobs) as ex:
+        if not all(ex.map(run, [c for c in chunks if c])):
+            print("Swift isn't installed (comes with Xcode); photos will be cropped centred.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source", help="folder of photos (searched recursively)")
@@ -185,6 +225,8 @@ def main():
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--no-places", action="store_true",
                     help="don't look up place names (captions show dates only)")
+    ap.add_argument("--no-framing", action="store_true",
+                    help="don't look for each photo's subject (photos are cropped centred)")
     args = ap.parse_args()
 
     src = os.path.expanduser(args.source)
@@ -249,6 +291,11 @@ def main():
         if removed:
             print(f"Pruned {removed} stale files.")
 
+    # Smart framing: subject regions for photos not analysed yet.
+    unframed = [e for e in entries.values() if "s" not in e]
+    if unframed and not args.no_framing:
+        find_subjects(unframed, out, min(4, args.jobs))
+
     with open(cache_path, "w") as f:
         json.dump(entries, f)
 
@@ -270,7 +317,7 @@ def main():
 
     photos = []
     for pid, e in entries.items():
-        p = {k: v for k, v in e.items() if k != "id"}
+        p = {k: v for k, v in e.items() if k != "id" and v is not None}
         date, pos = meta[pid]
         if date:
             p["d"] = date
@@ -280,6 +327,7 @@ def main():
     dated = sum("d" in p for p in photos)
     placed = sum("p" in p for p in photos)
     print(f"Captions: {dated} photos with a date, {placed} with a place name.")
+    print(f"Framing: {sum('s' in p for p in photos)} photos with a subject found.")
     rel = os.path.relpath(out, ROOT).replace(os.sep, "/")
     manifest = {"version": 1, "base": rel.rstrip("/") + "/", "photos": photos}
     with open(os.path.join(out, "manifest.js"), "w") as f:

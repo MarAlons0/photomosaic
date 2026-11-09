@@ -37,26 +37,45 @@ enum Framing {
         func union(_ s: [Span]) -> Span? {
             s.isEmpty ? nil : (s.map(\.lo).min()!, s.map(\.hi).max()!)
         }
-        let faceSpans = (faces.results ?? []).map { span($0.boundingBox) }
-        let eye = regions(attention.results?.first).map { span($0.boundingBox) }
-        let whole = regions(objects.results?.first).map { span($0.boundingBox) }
+        let faceBoxes = (faces.results ?? []).map(\.boundingBox)
+        let eyeBoxes = regions(attention.results?.first).map(\.boundingBox)
+        let wholeBoxes = regions(objects.results?.first).map(\.boundingBox)
+        let faceSpans = faceBoxes.map(span), eye = eyeBoxes.map(span), whole = wholeBoxes.map(span)
 
         // What to keep, best first: faces; where the eye goes plus whole objects (attention
-        // alone often stops short — a second animal, an owl's talons); where the eye goes;
-        // finally the centre of its strongest region.
+        // alone often stops short — a second animal, an owl's talons); where the eye goes.
+        // If none fits, the strongest region is placed below.
         let fits = { (s: Span) in s.hi - s.lo <= keep }
         var subject: Span? = union(faceSpans).flatMap { fits($0) ? $0 : nil }
         if subject == nil, let s = union(eye + whole), fits(s) { subject = s }
         if subject == nil, let s = union(eye), fits(s) { subject = s }
-        if subject == nil, let main = union(faceSpans) ?? eye.first ?? whole.first {
-            let c = (main.lo + main.hi) / 2
-            subject = (c - keep / 2, c + keep / 2)
-        }
-        guard let (lo, hi) = subject else { return 0.5 }
+
+        // The crop leaves the centre only as far as needed to keep (lo, hi) in, with a margin.
         let margin: CGFloat = 0.03
-        var start = (1 - keep) / 2                       // centred crop
-        if lo - margin < start { start = lo - margin }   // move up just enough…
-        if hi + margin > start + keep { start = hi + margin - keep }   // …or down
+        func place(_ lo: CGFloat, _ hi: CGFloat) -> CGFloat {
+            var start = (1 - keep) / 2
+            if lo - margin < start { start = lo - margin }               // move up…
+            if hi + margin > start + keep { start = hi + margin - keep }   // …or down
+            return start
+        }
+        let start: CGFloat
+        if let (lo, hi) = subject {
+            start = place(lo, hi)
+        } else if let box = faceBoxes.isEmpty ? (eyeBoxes.first ?? wholeBoxes.first)
+                                              : faceBoxes.dropFirst().reduce(faceBoxes[0], { $0.union($1) }) {
+            // The subject can't fit. A narrow one that's too tall (an animal sitting up in a
+            // square photo) keeps its top, where the head usually is; a scene spanning the
+            // frame (a waterfall), or a subject too wide, keeps its middle.
+            let main = span(box)
+            if vertical && box.width < 0.75 {
+                start = main.lo - margin
+            } else {
+                let c = (main.lo + main.hi) / 2
+                start = place(c - keep / 2, c + keep / 2)
+            }
+        } else {
+            return 0.5
+        }
         return min(1, max(0, start / (1 - keep)))
     }
 }

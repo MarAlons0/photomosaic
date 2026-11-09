@@ -5,6 +5,7 @@
  *   ?grid=60&duration=22&hold=3&tint=0.2&spacing=3   override settings
  *   ?direction=in|out|alternate                     zoom direction
  *   ?caption=off|date|place                         photo caption
+ *   ?framing=smart|centre                           photo framing
  *   ?demo=1      start straight away with demo scenes
  *   ?saver=1     never show the intro; use the built library, else the demo
  *   ?lib=NAME    use the library built into folder NAME (default: library)
@@ -12,11 +13,12 @@
 (function (PM) {
   'use strict';
 
-  PM.VERSION = '0.8.0'; // keep in sync with VERSION and the ?v= on index.html's script tags
+  PM.VERSION = '0.9.0'; // keep in sync with VERSION and the ?v= on index.html's script tags
 
-  const DEFAULTS = { direction: 'in', caption: 'place', grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
+  const DEFAULTS = { direction: 'in', caption: 'place', framing: 'smart', grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
   const DIRECTIONS = ['in', 'out', 'alternate'];
   const CAPTIONS = ['off', 'date', 'place'];
+  const FRAMINGS = ['smart', 'centre'];
   const RANGES = {
     grid: [20, 200, 10],
     duration: [6, 90, 1],
@@ -40,6 +42,8 @@
   if (!DIRECTIONS.includes(settings.direction)) settings.direction = DEFAULTS.direction;
   if (params.has('caption')) settings.caption = params.get('caption');
   if (!CAPTIONS.includes(settings.caption)) settings.caption = DEFAULTS.caption;
+  if (params.has('framing')) settings.framing = params.get('framing');
+  if (!FRAMINGS.includes(settings.framing)) settings.framing = DEFAULTS.framing;
   const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ } };
 
   const $ = sel => document.querySelector(sel);
@@ -169,6 +173,15 @@
     if (player && player.captionPhoto != null) showCaption(player.photos[player.captionPhoto]);
   };
 
+  // Photo framing changes every crop: re-crop and start a fresh mosaic.
+  const framingSelect = $('#set-framing');
+  framingSelect.value = settings.framing;
+  framingSelect.onchange = () => {
+    settings.framing = framingSelect.value;
+    save();
+    if (player) { player.resize(); player.restart(); }
+  };
+
   const dirSelect = $('#set-direction');
   dirSelect.value = settings.direction;
   dirSelect.onchange = () => { settings.direction = dirSelect.value; save(); };
@@ -177,9 +190,10 @@
     Object.assign(settings, DEFAULTS);
     dirSelect.value = settings.direction;
     captionSelect.value = settings.caption;
+    framingSelect.value = settings.framing;
     for (const k of Object.keys(RANGES)) { $(`#set-${k}`).value = settings[k]; $(`#val-${k}`).textContent = fmt[k](settings[k]); }
     save();
-    if (player) player.restart();
+    if (player) { player.resize(); player.restart(); }
   };
 
   const togglePanel = force => { panel.hidden = force == null ? !panel.hidden : !force; };

@@ -85,16 +85,20 @@ saliency on the full-size photo and returns a crop **position** along the trimme
 bottom/right). The crop leaves the centre only as far as needed to keep the subject (3% margin)
 inside. What it keeps, best first: faces; attention ∪ objectness
 regions (attention alone often stops short — the second hippo along the bottom edge, an owl's
-talons); attention alone; else it centres on the strongest region. Most photos stay centred.
+talons); attention alone. If none fits, it uses the strongest region: a narrow one (under 75% of
+the width) that's too tall keeps its top, where an animal's head usually is (v0.9.0); a scene
+spanning the frame (a waterfall) keeps its middle. Most photos stay centred.
 
-Only photos that fill the screen are framed — the mosaic photo and the target tile, while the next
-cycle is planned — so it adds no loading time. The position applies to every version of the photo:
-its atlas slot is redrawn, the 480 px / full-size textures pick it up when drawn, and the planner
-crops the mosaic photo the same way, so a tile grows seamlessly into its full-screen photo. Results
+Photos about to fill the screen — the mosaic photo and the target tile — are framed from their
+full-size versions while the next cycle is planned. Since v0.9.0 every other photo is framed too,
+in a background pass after the album loads (480 px versions, one at a time; ~2½ min for 3,624
+photos), because tiles grow large mid-zoom. The position applies to every version of the photo:
+atlas slots are redrawn in batches, the 480 px / full-size textures pick it up when drawn, and the
+planner crops the mosaic photo the same way, so a tile grows seamlessly into its full-screen photo.
 For this, the 480 px and full-size versions are requested **uncropped** (scaled to cover the
 screen; very tall photos capped at the pixel count of a 3:2 one): PhotoKit's exact-size aspect-fill
 requests come back already centre-cropped, which left nothing to move. Results
-are saved by asset identifier in `Caches/framing-v2.json` (purgeable; recomputed if lost). The
+are saved by asset identifier in `Caches/framing-v3.json` (purgeable; recomputed if lost). The
 *Photo framing* setting (Smart / Centre) restarts the player, which rebuilds the atlas.
 
 ## Building & installing (no Xcode clicks needed)

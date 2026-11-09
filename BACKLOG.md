@@ -13,6 +13,7 @@ _Last updated: 2026-11-08_
 - [ ] **Favicon kit** — replace the inline SVG icon with the standard kit per `FAVICON.md`. `[chore]`
 
 ## ✅ Shipped
+- [x] **Smart framing (browser)** — subject regions baked into the library on the Mac — v0.9.0
 - [x] **Smart framing** — crop follows each photo's subject (Apple TV, Vision saliency) — v0.8.0
 - [x] **Loading can hang at 0%** — decode() no longer blocks loading; per-photo pool timeout — v0.6.2
 - [x] **Photo caption (browser)** — dates and Apple place names baked in at build time — v0.7.0

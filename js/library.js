@@ -215,6 +215,7 @@
         });
         photo.date = e.d;    // "YYYY-MM-DD", from the photo's EXIF
         photo.place = e.p;   // e.g. "Yellowstone National Park, WY"
+        photo.subject = e.s; // subject regions for smart framing (PM.framePosition)
         photos.push(photo);
       }, onProgress);
       return photos.slice();   // late finishers (after a pool timeout) must not join later

@@ -106,10 +106,13 @@
       // screen width so the number of tiles on screen at that moment stays bounded.
       this.tinyAt = Math.max(56, this.W / 50);
       this.midAt = Math.max(110, this.W / 22);
+      const smart = this.settings.framing !== 'centre';
       for (const p of this.photos) {
-        for (const l of p.levels) l.crop = PM.cover(l.w, l.h, this.aspect);
         const [mw, mh] = PM.dims(p.micro);
-        p.feat = PM.gridFeatures(p.micro, PM.cover(mw, mh, this.aspect), 1, 8);
+        // Crop position along the trimmed axis, the same for every version of the photo.
+        p.pos = smart ? PM.framePosition(p.subject, mw, mh, this.aspect) : 0.5;
+        for (const l of p.levels) l.crop = PM.cover(l.w, l.h, this.aspect, p.pos);
+        p.feat = PM.gridFeatures(p.micro, PM.cover(mw, mh, this.aspect, p.pos), 1, 8);
       }
     }
 
@@ -177,7 +180,7 @@
             const { src, tainted } = await p.load[kind](this.W, this.H);
             if (m.get(i) !== entry) { PM.release(src); return; }  // evicted while loading
             const [w, h] = PM.dims(src);
-            entry.level = { src, w, h, kind, tainted, crop: PM.cover(w, h, this.aspect) };
+            entry.level = { src, w, h, kind, tainted, crop: PM.cover(w, h, this.aspect, p.pos) };
             p.levels = p.levels.filter(l => l.kind !== kind).concat(entry.level)
               .sort((x, y) => x.crop[2] - y.crop[2]);
             if (kind === 'hires') this.warm.push(src);

@@ -48,6 +48,12 @@ names with Apple's map service (one lookup per ~1 km area, cached in `library/pl
 with *Location Information* ticked so the files keep their GPS. The first build of a large album can
 take ~15 minutes for the lookups; later builds only look up new areas. `--no-places` skips them.
 
+**Smart framing.** Photos are cropped to the screen's shape. On a Mac the build also finds each
+photo's subject with Apple's Vision framework (about a minute for 3,600 photos, done once per photo),
+and the player moves each crop just enough to keep the subject on screen, whatever the window's
+shape. *Photo framing* in the settings (or `?framing=smart|centre`) switches it off;
+`--no-framing` skips the analysis. Photos picked or dropped in the browser are cropped centred.
+
 ### Several libraries
 
 Build each into its own folder and pick one with `?lib=`:

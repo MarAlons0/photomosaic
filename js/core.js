@@ -34,14 +34,56 @@ window.PM = window.PM || {};
 
   PM.dims = src => [src.naturalWidth || src.width, src.naturalHeight || src.height];
 
-  // Centred "object-fit: cover" crop of a w x h image to the given aspect: [sx, sy, sw, sh].
-  PM.cover = function (w, h, aspect) {
+  // "object-fit: cover" crop of a w x h image to the given aspect: [sx, sy, sw, sh].
+  // `pos` places it along the trimmed axis: 0 = top / left, 0.5 = centred, 1 = bottom / right.
+  PM.cover = function (w, h, aspect, pos = 0.5) {
     if (w / h > aspect) {
       const sw = h * aspect;
-      return [(w - sw) / 2, 0, sw, h];
+      return [(w - sw) * pos, 0, sw, h];
     }
     const sh = w / aspect;
-    return [0, (h - sh) / 2, w, sh];
+    return [0, (h - sh) * pos, w, sh];
+  };
+
+  /*
+   * Smart framing: the crop position (for PM.cover) that keeps a photo's subject on screen.
+   * `s` holds the subject regions found by tools/framing.swift: [F, U, E, M], boxes
+   * [x0, y0, x1, y1] from the top left (0 = none) — faces; where the eye goes plus whole
+   * objects; where the eye goes; the strongest region. The first of F, U, E that fits the
+   * crop is kept in view (the crop leaves the centre only as far as needed); else the crop
+   * keeps the top of M if M is a narrow, tall object, or its middle (scenes, wide subjects). Same rules as the Apple TV app (Framing.swift).
+   */
+  PM.framePosition = function (s, w, h, aspect) {
+    if (!s || Math.abs(w / h - aspect) < 0.01) return 0.5;
+    const vertical = w / h < aspect;   // the crop trims top and bottom
+    const keep = vertical ? w / aspect / h : (h * aspect) / w;
+    const [F, U, E, M] = s.map(b => (b ? (vertical ? [b[1], b[3]] : [b[0], b[2]]) : null));
+    const subject = [F, U, E].find(sp => sp && sp[1] - sp[0] <= keep);
+    // The crop leaves the centre only as far as needed to keep [lo, hi] in, with a margin.
+    const margin = 0.03;
+    const place = (lo, hi) => {
+      let start = (1 - keep) / 2;
+      if (lo - margin < start) start = lo - margin;
+      if (hi + margin > start + keep) start = hi + margin - keep;
+      return start;
+    };
+    let start;
+    if (subject) {
+      start = place(subject[0], subject[1]);
+    } else if (M) {
+      // The subject can't fit. A narrow one that's too tall (an animal sitting up in a
+      // square photo) keeps its top, where the head usually is; a scene spanning the frame
+      // (a waterfall), or a subject too wide, keeps its middle.
+      if (vertical && s[3][2] - s[3][0] < 0.75) {
+        start = M[0] - margin;
+      } else {
+        const c = (M[0] + M[1]) / 2;
+        start = place(c - keep / 2, c + keep / 2);
+      }
+    } else {
+      return 0.5;
+    }
+    return Math.min(1, Math.max(0, start / (1 - keep)));
   };
 
   let scratch = null, sctx = null;

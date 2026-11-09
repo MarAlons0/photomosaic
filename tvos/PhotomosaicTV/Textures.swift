@@ -86,25 +86,29 @@ struct Atlas {
         return Atlas(texture: tex)
     }
 
-    /// Redraw photo i's slot at a new crop position (after Framing found its subject).
-    func update(_ i: Int, micro: CGImage, position: CGFloat, aspect: CGFloat, queue: MTLCommandQueue) {
-        let crop = Features.cover(width: micro.width, height: micro.height, aspect: aspect, position: position)
-        guard let tile = micro.cropping(to: crop) else { return }
+    /// Redraw photos' slots at new crop positions (after Framing found their subjects):
+    /// (photo, micro, position) each, with one mipmap refresh for the batch.
+    func update(_ items: [(Int, CGImage, CGFloat)], aspect: CGFloat, queue: MTLCommandQueue) {
+        guard !items.isEmpty else { return }
         let w = Self.slotW, h = Self.slotH
         var pixels = [UInt8](repeating: 0, count: w * h * 4)
-        let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
-            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
-                                      bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
-            ctx.interpolationQuality = .high
-            ctx.draw(tile, in: CGRect(x: 0, y: 0, width: w, height: h))
-            return true
+        for (i, micro, position) in items {
+            let crop = Features.cover(width: micro.width, height: micro.height, aspect: aspect, position: position)
+            guard let tile = micro.cropping(to: crop) else { continue }
+            let drawn: Bool = pixels.withUnsafeMutableBytes { raw in
+                guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                          bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+                ctx.interpolationQuality = .high
+                ctx.draw(tile, in: CGRect(x: 0, y: 0, width: w, height: h))
+                return true
+            }
+            guard drawn else { continue }
+            let page = i / Self.perPage, s = i % Self.perPage
+            texture.replace(region: MTLRegionMake2D((s % Self.cols) * w, (s / Self.cols) * h, w, h),
+                            mipmapLevel: 0, slice: page, withBytes: pixels,
+                            bytesPerRow: w * 4, bytesPerImage: w * h * 4)
         }
-        guard drawn else { return }
-        let page = i / Self.perPage, s = i % Self.perPage
-        texture.replace(region: MTLRegionMake2D((s % Self.cols) * w, (s / Self.cols) * h, w, h),
-                        mipmapLevel: 0, slice: page, withBytes: pixels,
-                        bytesPerRow: w * 4, bytesPerImage: w * h * 4)
         TextureFactory.generateMipmaps(texture, queue: queue, wait: false)
     }
 

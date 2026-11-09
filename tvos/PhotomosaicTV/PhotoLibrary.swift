@@ -37,9 +37,10 @@ final class PhotoLibrary: ObservableObject {
     /// Positions found so far, by asset identifier — saved, so each photo is framed once.
     private var framed: [String: Double] = [:]
     private static let framingFile = FileManager.default
-        .urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("framing-v2.json")
+        .urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("framing-v3.json")
 
-    private var generation = 0
+    /// Bumped on every album load; work started for an older album checks it and stops.
+    private(set) var generation = 0
 
     /// Load album `albumID` ("" = the preferred album, else the largest shared album).
     /// Safe to call again to switch albums.
@@ -168,10 +169,14 @@ final class PhotoLibrary: ObservableObject {
     }
 
     /// Record photo i's crop position (and refresh its tile colours to match).
-    func setPosition(_ i: Int, _ t: CGFloat) {
+    func setPosition(_ i: Int, _ t: CGFloat, save: Bool = true) {
         positions[i] = t
         framed[assets[i].localIdentifier] = Double(t)
         updateFeatures(i)
+        if save { saveFraming() }
+    }
+
+    func saveFraming() {
         if let data = try? JSONEncoder().encode(framed) {
             try? data.write(to: Self.framingFile, options: .atomic)
         }

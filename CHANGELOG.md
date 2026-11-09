@@ -4,6 +4,14 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.9.0] – 2026-11-08
+### Added
+- **Smart framing in the browser player**: each photo's crop moves to keep its subject on screen, as on the Apple TV. `build_library.py` finds the subject regions with Apple's Vision framework through the new `tools/framing.swift` helper (macOS; once per photo, cached; ~1 minute for Portfolio's 3,624 photos) and stores them in the manifest. The player works out each crop for the window's actual shape, so it also works on 16:10 screens or odd-shaped windows. New *Photo framing* setting (Smart / Centre), or `?framing=smart|centre`; `--no-framing` skips the analysis. Photos picked or dropped in the browser are cropped centred.
+
+### Changed
+- Apple TV: smart framing now covers **every photo in the album**, not just those that fill the screen, since tiles grow large mid-zoom too. After the album loads, the app frames all photos in the background (about 2½ minutes for Portfolio's 3,624, once — results are kept).
+- Smart framing, both players: when a narrow subject is too tall for the crop (an animal sitting up in a square photo), the crop keeps its top, where the head usually is, instead of its middle, which cut off the head and the feet. Scenes that span the frame (waterfalls, landscapes) still keep their middle.
+
 ## [0.8.0] – 2026-11-08
 ### Added
 - **Smart framing (Apple TV)**: photos are cropped to the 16:9 screen, which trims the top and bottom of 3:2 and portrait shots. The crop now moves up or down just enough to keep each photo's subject in view: a bird near the top edge, a flower at the bottom. Subjects are found on the Apple TV with Apple's Vision framework (faces, where the eye goes, and whole objects, so a second animal or an owl's talons near the edge are kept too) when a photo is about to fill the screen. Its tile, mosaic and full-size version all use the same crop, and each photo is checked once (results kept between launches). New *Photo framing* setting: Smart / Centre.
