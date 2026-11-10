@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.9.1] – 2026-11-10
+### Fixed
+- Apple TV: settings such as *Direction* couldn't be changed — on tvOS 27, pickers inside the settings screen don't open their list. Every setting now opens its own list of choices (plain buttons, ✓ on the current one), as the album chooser already did.
+
 ## [0.9.0] – 2026-11-08
 ### Added
 - **Smart framing in the browser player**: each photo's crop moves to keep its subject on screen, as on the Apple TV. `build_library.py` finds the subject regions with Apple's Vision framework through the new `tools/framing.swift` helper (macOS; once per photo, cached; ~1 minute for Portfolio's 3,624 photos) and stores them in the manifest. The player works out each crop for the window's actual shape, so it also works on 16:10 screens or odd-shaped windows. New *Photo framing* setting (Smart / Centre), or `?framing=smart|centre`; `--no-framing` skips the analysis. Photos picked or dropped in the browser are cropped centred.
