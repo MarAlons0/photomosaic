@@ -4,6 +4,13 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.9.2] – 2026-11-10
+### Fixed
+- Apple TV: the app quit after a few cycles — the system ended it for using too much memory (over its ~2 GB limit). Since 0.8.0 photos are loaded uncropped so smart framing can choose the crop, which made each one larger, and the caches of loaded photos were limited by count (700 at 480 px, 14 at full size). They're now limited by memory (300 MB and 500 MB), and Vision's working memory is freed after each photo is framed. Photos also load at most 2 full-size and 4 at 480 px at a time (they all started together when a cycle began), skipping any no longer needed. The app now settles at about 1.3 GB.
+
+### Added
+- Apple TV: a memory log (`Library/Caches/memory.log` in the app's container, a line every 15 s) for diagnosing memory problems from the Mac — see `tvos/PhotomosaicTV/MemoryLog.swift`.
+
 ## [0.9.1] – 2026-11-10
 ### Fixed
 - Apple TV: settings such as *Direction* couldn't be changed — on tvOS 27, pickers inside the settings screen don't open their list. Every setting now opens its own list of choices (plain buttons, ✓ on the current one), as the album chooser already did.

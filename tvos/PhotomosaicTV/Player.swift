@@ -37,7 +37,7 @@ final class Player: NSObject, ObservableObject {
     private var singlePipeline: MTLRenderPipelineState!
     private let sampler: MTLSamplerState
     private var atlas: Atlas?
-    private var cache: TextureCache?
+    private(set) var cache: TextureCache?
 
     private var current: CyclePlan?
     private var pending: CyclePlan?
@@ -123,11 +123,15 @@ final class Player: NSObject, ObservableObject {
         status = ""
         running = true
         Self.frameAll(self)
+        MemoryLog.run(self)
     }
 
     /// Fetch photo i at full size (kept in the cache for drawing) and return it for analysis.
     @discardableResult
     private func fetchHires(_ i: Int) async -> CGImage? {
+        guard let gate = cache?.gates[.hires] else { return nil }
+        await gate.enter()
+        defer { gate.leave() }
         guard let image = await library.large(i, size: TextureCache.sizes[.hires]!) else { return nil }
         await cache?.store(.hires, i, image: image)
         return image
@@ -191,7 +195,11 @@ final class Player: NSObject, ObservableObject {
                 guard let p = player, gen == p.library.generation else { return }
                 guard p.library.needsFraming(i) else { continue }
                 let library = p.library, aspect = p.aspect
-                guard let image = await library.large(i, size: TextureCache.sizes[.mid]!) else { continue }
+                guard let gate = p.cache?.gates[.mid] else { return }
+                await gate.enter()
+                let image = await library.large(i, size: TextureCache.sizes[.mid]!)
+                gate.leave()
+                guard let image else { continue }
                 let t = await Task.detached(priority: .utility) {
                     Framing.position(of: image, aspect: aspect)
                 }.value

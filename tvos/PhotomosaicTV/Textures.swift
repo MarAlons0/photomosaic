@@ -134,21 +134,59 @@ struct PhotoTexture {
     }
 }
 
-/// LRU caches of on-demand photo versions. Pinned photos are never evicted.
+/// Lets at most `limit` tasks through at a time; the rest wait their turn (first come,
+/// first served). Loading a photo briefly holds it three times over — PhotoKit's decoded
+/// image, the pixel copy and the texture, ~150 MB for a full-size one — so loads are
+/// spaced out instead of all starting together when a cycle begins.
+@MainActor
+final class Gate {
+    private let limit: Int
+    private var running = 0
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    init(_ limit: Int) { self.limit = limit }
+
+    func enter() async {
+        if running < limit { running += 1; return }
+        await withCheckedContinuation { waiting.append($0) }   // the slot is handed over
+    }
+
+    func leave() {
+        if waiting.isEmpty { running -= 1 } else { waiting.removeFirst().resume() }
+    }
+
+    var busy: Int { running + waiting.count }
+}
+
+/// LRU caches of on-demand photo versions, each kept within a memory budget (photos are
+/// loaded uncropped, so their size varies with shape). Pinned photos are never evicted.
 @MainActor
 final class TextureCache {
     enum Kind { case mid, hires }
 
     static let sizes: [Kind: CGSize] = [.mid: CGSize(width: 480, height: 270),
                                         .hires: CGSize(width: 3840, height: 2160)]
-    static let caps: [Kind: Int] = [.mid: 700, .hires: 14]
+    /// Bytes per cache. The app may use about 2 GB on an Apple TV before the system ends it;
+    /// these plus the atlas (~170 MB for 6,000 photos) stay well under that. A screen holds at
+    /// most ~350 tiles large enough for the 480 px version (~1 MB each with mipmaps); a full
+    /// size photo takes 45–60 MB, and up to 11 are pinned around the target tile.
+    static let budgets: [Kind: Int] = [.mid: 300 << 20, .hires: 500 << 20]
 
     private struct Entry {
         var texture: MTLTexture?
         var lastUse: Int
+        var bytes: Int { texture.map { $0.width * $0.height * 4 * 4 / 3 } ?? 0 }   // with mipmaps
     }
 
     private var entries: [Kind: [Int: Entry]] = [.mid: [:], .hires: [:]]
+    private(set) var used: [Kind: Int] = [.mid: 0, .hires: 0]
+    /// Loads in progress at once, per size (see Gate).
+    let gates: [Kind: Gate] = [.mid: Gate(4), .hires: Gate(2)]
+
+    /// Photos held and loads in progress, per size (for the memory log).
+    func census(_ kind: Kind) -> (held: Int, loading: Int) {
+        (entries[kind]!.values.filter { $0.texture != nil }.count, gates[kind]!.busy)
+    }
     var pinned: Set<Int> = []
     private var clock = 0
 
@@ -182,10 +220,14 @@ final class TextureCache {
             return
         }
         entries[kind]![i] = Entry(texture: nil, lastUse: clock)
-        evict(kind)
         let size = Self.sizes[kind]!
+        let gate = gates[kind]!
         Task {
-            guard let image = await library.large(i, size: size) else { return }
+            await gate.enter()
+            defer { gate.leave() }
+            // Dropped while waiting (zooming moves on quickly): no need to load it any more.
+            guard entries[kind]?[i] != nil,
+                  let image = await library.large(i, size: size) else { return }
             await self.store(kind, i, image: image)
         }
     }
@@ -198,15 +240,20 @@ final class TextureCache {
         }.value
         guard let tex else { return }
         clock += 1
-        entries[kind]![i] = Entry(texture: tex, lastUse: clock)
+        let entry = Entry(texture: tex, lastUse: clock)
+        used[kind]! += entry.bytes - (entries[kind]![i]?.bytes ?? 0)
+        entries[kind]![i] = entry
         evict(kind)
     }
 
+    /// Drop the least recently used unpinned photos until the cache is within its budget.
+    /// (Requests still loading take no memory and are kept, unless far too many pile up.)
     private func evict(_ kind: Kind) {
-        let cap = Self.caps[kind]!
-        while entries[kind]!.count > cap {
-            guard let victim = entries[kind]!.filter({ !pinned.contains($0.key) })
-                .min(by: { $0.value.lastUse < $1.value.lastUse })?.key else { return }
+        let budget = Self.budgets[kind]!
+        while used[kind]! > budget || entries[kind]!.count > 2000 {
+            guard let (victim, e) = entries[kind]!.filter({ !pinned.contains($0.key) })
+                .min(by: { $0.value.lastUse < $1.value.lastUse }) else { return }
+            used[kind]! -= e.bytes
             entries[kind]![victim] = nil
         }
     }

@@ -16,6 +16,12 @@ import Vision
 
 enum Framing {
     static func position(of image: CGImage, aspect: CGFloat) -> CGFloat {
+        // Vision's working buffers are autoreleased; free them now rather than whenever the
+        // background thread's pool happens to drain (the pass runs over thousands of photos).
+        autoreleasepool { compute(image, aspect: aspect) }
+    }
+
+    private static func compute(_ image: CGImage, aspect: CGFloat) -> CGFloat {
         let W = CGFloat(image.width), H = CGFloat(image.height)
         guard W > 0, H > 0, abs(W / H - aspect) > 0.01 else { return 0.5 }
         let vertical = W / H < aspect          // the crop trims top and bottom
