@@ -108,6 +108,18 @@ Root requests resolve to `user.github.io/favicon.ico`, which belongs to a *diffe
 so root serving is unreliable. Rely on the `<link>` tags with paths relative to the project
 subpath. (Acceptable — tab icons work; bookmark icons are best-effort here.)
 
+### Local apps (`localhost:<port>`) — one host name per app
+Safari keeps **one bookmark icon per host name and ignores the port**. Every app served on
+`localhost` (`localhost:8765`, `localhost:8770`, …) shares a single icon slot, so a bookmark
+can show *another* local app's icon. Seen: Photomosaic's Favorite showing Discovery
+Dashboard's record icon. Root icon files alone don't fix it, because the apps still
+overwrite each other's slot.
+
+Bookmark each local app under its own host name: for example `localhost` for one and
+`127.0.0.1` for another (`python3 -m http.server` answers on both by default; one started
+with `--bind 127.0.0.1` answers only there). Note the chosen host in the app's README and
+bookmark that exact URL.
+
 ---
 
 ## Verifying
