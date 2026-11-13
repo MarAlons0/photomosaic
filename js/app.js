@@ -13,7 +13,7 @@
 (function (PM) {
   'use strict';
 
-  PM.VERSION = '0.9.2'; // keep in sync with VERSION and the ?v= on index.html's script tags
+  PM.VERSION = '0.9.3'; // keep in sync with VERSION and the ?v= on index.html's script tags
 
   const DEFAULTS = { direction: 'in', caption: 'place', framing: 'smart', grid: 100, duration: 22, hold: 3, tint: 0.2, spacing: 3 };
   const DIRECTIONS = ['in', 'out', 'alternate'];

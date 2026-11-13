@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.9.3] – 2026-11-12
+### Fixed
+- Browser: Photomosaic had no icon files of its own (only an inline one for the tab), so Safari's Favorites showed the icon of another app served on `localhost`. It now has the standard favicon kit at the site root (`favicon.ico`, 16/32 px PNGs, `apple-touch-icon.png`), made from the Apple TV app icon, and the README suggests bookmarking `127.0.0.1:8765`, since Safari keeps one icon per host name whatever the port.
+
 ## [0.9.2] – 2026-11-10
 ### Fixed
 - Apple TV: the app quit after a few cycles — the system ended it for using too much memory (over its ~2 GB limit). Since 0.8.0 photos are loaded uncropped so smart framing can choose the crop, which made each one larger, and the caches of loaded photos were limited by count (700 at 480 px, 14 at full size). They're now limited by memory (300 MB and 500 MB), and Vision's working memory is freed after each photo is framed. Photos also load at most 2 full-size and 4 at 480 px at a time (they all started together when a cycle began), skipping any no longer needed. The app now settles at about 1.3 GB.

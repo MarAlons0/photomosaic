@@ -95,6 +95,10 @@ file:///Users/<you>/Documents/Claude-code-projects/Photomosaic/index.html?saver=
 > serve the folder instead (`python3 -m http.server 8765` from this directory) and use
 > `http://localhost:8765/?saver=1`.
 
+> **Bookmarking it in Safari:** use `http://127.0.0.1:8765/` rather than `localhost`. Safari keeps one
+> bookmark icon per host name (ports don't count), so other apps served on `localhost` would
+> otherwise lend Photomosaic their icon.
+
 ## Apple TV
 
 A native tvOS version lives in [`tvos/`](tvos/). It reads photos straight from iCloud Photos on the
