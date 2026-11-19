@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [Unreleased]
+### Changed
+- `tvos/build-mac.sh` builds in a temporary folder that's deleted afterwards, so `dist/` holds only `Photomosaic.app` and the zip (plus `build.log` when a build fails), and no stray copies of the app show up in Spotlight.
+
 ## [0.10.0] – 2026-11-19
 ### Added
 - **Mac app**: a native macOS version of the Apple TV app that reads an album, or the newest photos, straight from the Photos library, so it needs no export, library build or local server. It keeps the display's shape (16:10 on most Macs) and has the browser's keys: F full screen, Space pause, N or → next photo, S settings. The display stays awake while it plays. `tvos/build-mac.sh` builds a universal copy into `dist/` (app and zip) to share; it's signed ad hoc, so on another Mac it's allowed once with *Open Anyway*. See `docs/mac.md`.
