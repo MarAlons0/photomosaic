@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var before: (album: String, direction: String, grid: Int, framing: String)?
     @State private var wasPaused = false
     @Environment(\.scenePhase) private var scenePhase
+    @State private var inBackground = false
 
     private let aspect: CGFloat = 16.0 / 9.0
 
@@ -46,9 +47,17 @@ struct ContentView: View {
         // tvOS can drop the "no screen saver" request (e.g. when the app returns to the
         // foreground), so re-assert it whenever we become active and every minute.
         .onChange(of: scenePhase) { _, phase in
+            MemoryLog.note("scene phase: \(phase)")
+            // Coming back, tvOS may report only .inactive (no .active), so either counts.
+            if phase != .background && inBackground { inBackground = false; player?.enteredForeground() }
             if phase == .active { keepAwake() }
-            // Leaving the app closes settings, so it always reopens on the running mosaic.
-            if phase == .background && showSettings { showSettings = false }
+            if phase == .background {
+                // Leaving the app closes settings, so it always reopens on the running mosaic.
+                if showSettings { showSettings = false }
+                // Free the loaded photos so tvOS keeps the app while other apps are in front.
+                inBackground = true
+                player?.enteredBackground()
+            }
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in keepAwake() }
         .onChange(of: library.phase) { _, phase in

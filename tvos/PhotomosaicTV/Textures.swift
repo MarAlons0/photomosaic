@@ -246,6 +246,16 @@ final class TextureCache {
         evict(kind)
     }
 
+    /// Drop every loaded photo (the app is going into the background: tvOS closes the
+    /// largest suspended apps first when memory runs short). Loads still running finish
+    /// and are kept; anything else is fetched again when next needed.
+    func purge() {
+        for kind in [Kind.mid, .hires] {
+            entries[kind] = entries[kind]!.filter { $0.value.texture == nil }
+            used[kind] = 0
+        }
+    }
+
     /// Drop the least recently used unpinned photos until the cache is within its budget.
     /// (Requests still loading take no memory and are kept, unless far too many pile up.)
     private func evict(_ kind: Kind) {

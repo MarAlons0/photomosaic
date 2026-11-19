@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.9.4] – 2026-11-19
+### Changed
+- Apple TV: going into the background (another app in front), the app frees its loaded photos (~800 MB), keeping only the tile atlas. tvOS closes the largest suspended apps first when memory runs short, so Photomosaic was often closed and started over from the beginning; now it usually resumes where it was. Back in front, the full-size photos around the current spot reload straight away. Both events are noted in the memory log.
+
 ## [0.9.3] – 2026-11-12
 ### Fixed
 - Browser: Photomosaic had no icon files of its own (only an inline one for the tab), so Safari's Favorites showed the icon of another app served on `localhost`. It now has the standard favicon kit at the site root (`favicon.ico`, 16/32 px PNGs, `apple-touch-icon.png`), made from the Apple TV app icon, and the README suggests bookmarking `127.0.0.1:8765`, since Safari keeps one icon per host name whatever the port.

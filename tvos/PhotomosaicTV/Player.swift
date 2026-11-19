@@ -290,6 +290,22 @@ final class Player: NSObject, ObservableObject {
         for r in r0...r1 { for c in c0...c1 { cache?.request(.mid, plan.assign[r * n + c]) } }
     }
 
+    /// Into the background: free the loaded photos (~800 MB), keeping the tile atlas, so
+    /// the app is no longer the first one tvOS closes and resumes where it was.
+    func enteredBackground() {
+        cache?.purge()
+        MemoryLog.note("background: caches released, footprint \(MemoryLog.footprint()) MB")
+    }
+
+    /// Back in front: reload the full-size photos around the current spot straight away;
+    /// tiles show their atlas versions until the rest come back as they're drawn.
+    func enteredForeground() {
+        MemoryLog.note("foreground: reloading \(cache?.pinned.count ?? 0) full-size photos")
+        guard let cache, let plan = current else { return }
+        for i in cache.pinned { cache.request(.hires, i) }
+        if plan.dir == .zoomOut { prefetchMid(plan) }
+    }
+
     func skip() {
         if let next = pending { install(next) }
     }

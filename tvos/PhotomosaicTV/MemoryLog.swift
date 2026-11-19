@@ -41,6 +41,9 @@ enum MemoryLog {
         }
     }
 
+    /// An event line (going into the background, coming back).
+    static func note(_ text: String) { write(text) }
+
     private static var lines = 0
 
     private static func write(_ text: String) {
