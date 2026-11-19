@@ -107,6 +107,13 @@ free Apple ID (installs last 7 days) — see [docs/appletv.md](docs/appletv.md).
 settings, click pauses, swipe right skips ahead, and Play/Pause controls any music playing in the
 background.
 
+## Mac app
+
+A native macOS version, built from the Apple TV app's code (in [`tvos/`](tvos/)): it reads an
+album, or your newest photos, straight from the Photos library, with no export or library build.
+`tvos/build-mac.sh` builds a shareable copy into `dist/`. Keys as in the browser: F full screen,
+Space pause, N or → next photo, S settings. See [docs/mac.md](docs/mac.md).
+
 ## How it works
 
 - **Matching.** Every photo is summarised by the average CIELAB colour of its four quadrants

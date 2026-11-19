@@ -58,7 +58,7 @@ final class Player: NSObject, ObservableObject {
     private var bufferIndex = 0
     private let inFlight = DispatchSemaphore(value: 3)
 
-    private let aspect: CGFloat = 16.0 / 9.0
+    private let aspect = Screen.aspect
 
     init(library: PhotoLibrary, settings: AppSettings) {
         self.library = library
@@ -490,17 +490,4 @@ extension Player: MTKViewDelegate {
     nonisolated func draw(in view: MTKView) {
         MainActor.assumeIsolated { self.render(view) }
     }
-}
-
-/// The Metal view hosting the player.
-struct PlayerView: UIViewRepresentable {
-    let player: Player
-
-    func makeUIView(context: Context) -> MTKView {
-        let view = MTKView()
-        player.configure(view)
-        return view
-    }
-
-    func updateUIView(_ view: MTKView, context: Context) {}
 }

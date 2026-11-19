@@ -8,12 +8,23 @@
 
 /* Begin PBXFileReference section */
 		C0FFEE00000000000000000A /* PhotomosaicTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotomosaicTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0FFEE00000000000000001B /* Photomosaic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photomosaic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C0FFEE00000000000000000B /* PhotomosaicTV */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PhotomosaicTV;
+			sourceTree = "<group>";
+		};
+		C0FFEE000000000000000019 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		C0FFEE00000000000000001A /* PhotomosaicMac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotomosaicMac;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,13 +37,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0FFEE00000000000000001E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		C0FFEE00000000000000000D = {
 			isa = PBXGroup;
 			children = (
+				C0FFEE000000000000000019 /* Shared */,
 				C0FFEE00000000000000000B /* PhotomosaicTV */,
+				C0FFEE00000000000000001A /* PhotomosaicMac */,
 				C0FFEE00000000000000000E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				C0FFEE00000000000000000A /* PhotomosaicTV.app */,
+				C0FFEE00000000000000001B /* Photomosaic.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,6 +82,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				C0FFEE000000000000000019 /* Shared */,
 				C0FFEE00000000000000000B /* PhotomosaicTV */,
 			);
 			name = PhotomosaicTV;
@@ -68,6 +90,29 @@
 			);
 			productName = PhotomosaicTV;
 			productReference = C0FFEE00000000000000000A /* PhotomosaicTV.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C0FFEE00000000000000001C /* Photomosaic */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0FFEE000000000000000020 /* Build configuration list for PBXNativeTarget "Photomosaic" */;
+			buildPhases = (
+				C0FFEE00000000000000001D /* Sources */,
+				C0FFEE00000000000000001E /* Frameworks */,
+				C0FFEE00000000000000001F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C0FFEE000000000000000019 /* Shared */,
+				C0FFEE00000000000000001A /* PhotomosaicMac */,
+			);
+			name = Photomosaic;
+			packageProductDependencies = (
+			);
+			productName = Photomosaic;
+			productReference = C0FFEE00000000000000001B /* Photomosaic.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -81,6 +126,9 @@
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					C0FFEE00000000000000000F = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					C0FFEE00000000000000001C = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -100,6 +148,7 @@
 			projectRoot = "";
 			targets = (
 				C0FFEE00000000000000000F /* PhotomosaicTV */,
+				C0FFEE00000000000000001C /* Photomosaic */,
 			);
 		};
 /* End PBXProject section */
@@ -112,10 +161,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0FFEE00000000000000001F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C0FFEE000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0FFEE00000000000000001D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -184,7 +247,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.4;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.marioalonso.PhotomosaicTV;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -210,12 +273,72 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.9.4;
+				MARKETING_VERSION = 0.10.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.marioalonso.PhotomosaicTV;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 3;
+			};
+			name = Release;
+		};
+		C0FFEE000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Photomosaic;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photomosaic builds mosaics from the photos in your library and shared albums. They stay on this Mac.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.10.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marioalonso.Photomosaic;
+				PRODUCT_NAME = Photomosaic;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C0FFEE000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Photomosaic;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photomosaic builds mosaics from the photos in your library and shared albums. They stay on this Mac.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.10.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marioalonso.Photomosaic;
+				PRODUCT_NAME = Photomosaic;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -236,6 +359,15 @@
 			buildConfigurations = (
 				C0FFEE000000000000000015 /* Debug */,
 				C0FFEE000000000000000016 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0FFEE000000000000000020 /* Build configuration list for PBXNativeTarget "Photomosaic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0FFEE000000000000000021 /* Debug */,
+				C0FFEE000000000000000022 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

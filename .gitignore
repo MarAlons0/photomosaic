@@ -12,3 +12,6 @@ DerivedData/
 # Local notes
 Photomosaic on Mac.md
 Portfolio/
+
+# Mac app builds (tvos/build-mac.sh)
+dist/

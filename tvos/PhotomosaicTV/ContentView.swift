@@ -17,7 +17,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var inBackground = false
 
-    private let aspect: CGFloat = 16.0 / 9.0
+    private let aspect = Screen.aspect   // 16:9, the default
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -30,6 +30,7 @@ struct ContentView: View {
                 Caption(text: caption)
             }
         }
+        .overlay(alignment: .bottomTrailing) { Watermark() }
         .ignoresSafeArea()
         .focusable()
         .onTapGesture { player?.paused.toggle() }

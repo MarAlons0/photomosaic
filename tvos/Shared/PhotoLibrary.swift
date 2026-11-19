@@ -1,11 +1,15 @@
 /*
  * The photo source: one album from iCloud Photos via PhotoKit.
  *
- * Every photo gets a "micro" covering 96x54 px (kept in memory: the tile atlas and
- * colour features). Larger versions are requested on demand.
+ * Every photo gets a "micro" covering one atlas slot, 96x54 px at 16:9 (kept in memory:
+ * the tile atlas and colour features). Larger versions are requested on demand.
  */
 import Photos
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 @MainActor
 final class PhotoLibrary: ObservableObject {
@@ -18,7 +22,11 @@ final class PhotoLibrary: ObservableObject {
     }
 
     static let preferredAlbum = "Portfolio"
-    static let microSize = CGSize(width: 96, height: 54)   // one 16:9 atlas slot
+    /// Not an album: the newest photos of the whole library, for people who don't keep
+    /// albums (and the fallback when no album fits). Capped to keep memory in bounds.
+    static let recentID = "recents"
+    static let recentLimit = 5000
+    static var microSize: CGSize { CGSize(width: Atlas.slotW, height: Atlas.slotH) }   // one atlas slot
 
     @Published private(set) var phase: Phase = .requestingAccess
     @Published private(set) var albumTitle = ""
@@ -36,13 +44,13 @@ final class PhotoLibrary: ObservableObject {
     private var positions: [CGFloat] = []
     /// Positions found so far, by asset identifier — saved, so each photo is framed once.
     private var framed: [String: Double] = [:]
-    private static let framingFile = FileManager.default
-        .urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("framing-v3.json")
+    private static let framingFile = AppFiles.caches.appendingPathComponent("framing-v3.json")
 
     /// Bumped on every album load; work started for an older album checks it and stops.
     private(set) var generation = 0
 
-    /// Load album `albumID` ("" = the preferred album, else the largest shared album).
+    /// Load album `albumID` ("" = the preferred album, else the largest shared album, else the
+    /// largest library album, else the newest photos; recentID = the newest photos).
     /// Safe to call again to switch albums.
     func start(aspect: CGFloat, albumID: String) {
         self.aspect = aspect
@@ -84,9 +92,14 @@ final class PhotoLibrary: ObservableObject {
                                            count: n, shared: subtype == .albumCloudShared))
                 }
         }
-        return out.sorted {
+        out.sort {
             $0.shared != $1.shared ? $0.shared : $0.title.localizedStandardCompare($1.title) == .orderedAscending
         }
+        let recent = min(Self.recentLimit, PHAsset.fetchAssets(with: Self.imagesOnly).count)
+        if recent >= Self.minAlbumSize {
+            out.insert(AlbumChoice(id: Self.recentID, title: "Recent photos", count: recent, shared: false), at: 0)
+        }
+        return out
     }
 
     private func pickAlbum(id: String) -> PHAssetCollection? {
@@ -104,22 +117,36 @@ final class PhotoLibrary: ObservableObject {
                 }
             if let match { return match }
         }
-        // Otherwise the largest shared album.
-        var best: (PHAssetCollection, Int)?
-        PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil)
-            .enumerateObjects { c, _, _ in
-                let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
-                if n > (best?.1 ?? 0) { best = (c, n) }
-            }
-        return best?.0
+        // Otherwise the largest shared album, else the largest library album (of a useful size).
+        for subtype in [PHAssetCollectionSubtype.albumCloudShared, .albumRegular] {
+            var best: (PHAssetCollection, Int)?
+            PHAssetCollection.fetchAssetCollections(with: .album, subtype: subtype, options: nil)
+                .enumerateObjects { c, _, _ in
+                    let n = PHAsset.fetchAssets(in: c, options: Self.imagesOnly).count
+                    if n >= Self.minAlbumSize, n > (best?.1 ?? 0) { best = (c, n) }
+                }
+            if let best { return best.0 }
+        }
+        return nil
+    }
+
+    /// The photos to show: album `id`, or the newest photos of the library (see recentID).
+    private func fetch(id: String) -> (title: String, photos: PHFetchResult<PHAsset>)? {
+        if id != Self.recentID, let album = pickAlbum(id: id) {
+            return (album.localizedTitle ?? "Album", PHAsset.fetchAssets(in: album, options: Self.imagesOnly))
+        }
+        let o = Self.imagesOnly
+        o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        o.fetchLimit = Self.recentLimit
+        let photos = PHAsset.fetchAssets(with: o)
+        return photos.count > 1 ? ("Recent photos", photos) : nil
     }
 
     private func loadAlbum(id: String) {
         generation += 1
         let gen = generation
-        guard let album = pickAlbum(id: id) else { phase = .noAlbum; return }
-        albumTitle = album.localizedTitle ?? "Album"
-        let fetched = PHAsset.fetchAssets(in: album, options: Self.imagesOnly)
+        guard let (title, fetched) = fetch(id: id) else { phase = .noAlbum; return }
+        albumTitle = title
         var list: [PHAsset] = []
         list.reserveCapacity(fetched.count)
         fetched.enumerateObjects { a, _, _ in list.append(a) }
@@ -140,7 +167,7 @@ final class PhotoLibrary: ObservableObject {
         opts.resizeMode = .fast
         loaded = 0
         for (i, asset) in list.enumerated() {
-            // aspectFill: even portrait photos keep 96x54 px after the 16:9 crop.
+            // aspectFill: even portrait photos cover a whole slot after the screen-shaped crop.
             PHImageManager.default().requestImage(for: asset, targetSize: Self.microSize,
                                                   contentMode: .aspectFill, options: opts) { image, _ in
                 Task { @MainActor in
@@ -221,6 +248,7 @@ final class PhotoLibrary: ObservableObject {
     }
 }
 
+#if canImport(UIKit)
 /// CGImage with the UIImage's orientation applied (PhotoKit may return rotated images).
 func upright(_ image: UIImage) -> CGImage? {
     if image.imageOrientation == .up, let cg = image.cgImage { return cg }
@@ -230,3 +258,9 @@ func upright(_ image: UIImage) -> CGImage? {
         .image { _ in image.draw(at: .zero) }
         .cgImage
 }
+#else
+/// CGImage of a PhotoKit NSImage (already upright on macOS).
+func upright(_ image: NSImage) -> CGImage? {
+    image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+}
+#endif

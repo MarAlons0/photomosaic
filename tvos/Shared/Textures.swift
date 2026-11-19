@@ -4,7 +4,6 @@
  */
 import CoreGraphics
 import Metal
-import UIKit
 
 enum TextureFactory {
     /// RGBA texture (with mipmaps, for smooth minification) holding `image`. Thread-safe.
@@ -38,13 +37,15 @@ enum TextureFactory {
     }
 }
 
-/// Every photo's micro, cropped to 16:9 at its crop position, in fixed 96x54 slots of a
-/// texture array.
+/// Every photo's micro, cropped to the screen's shape at its crop position, in fixed slots
+/// 96 px wide (96x54 at 16:9, 96x60 at 16:10) of a texture array.
 struct Atlas {
     static let side = 4096
-    static let slotW = 96, slotH = 54
-    static let cols = side / slotW, rows = side / slotH
-    static let perPage = cols * rows
+    static let slotW = 96
+    static var slotH: Int { Int((CGFloat(slotW) / Screen.aspect).rounded()) }
+    static let cols = side / slotW
+    static var rows: Int { side / slotH }
+    static var perPage: Int { cols * rows }
 
     let texture: MTLTexture
 
@@ -121,7 +122,7 @@ struct Atlas {
     }
 }
 
-/// One photo version on the GPU, with the UV rectangle of its 16:9 cover crop.
+/// One photo version on the GPU, with the UV rectangle of its screen-shaped cover crop.
 struct PhotoTexture {
     let texture: MTLTexture
     let uv: SIMD4<Float>
@@ -164,8 +165,11 @@ final class Gate {
 final class TextureCache {
     enum Kind { case mid, hires }
 
-    static let sizes: [Kind: CGSize] = [.mid: CGSize(width: 480, height: 270),
-                                        .hires: CGSize(width: 3840, height: 2160)]
+    /// Screen-shaped: 480x270 and 3840x2160 at 16:9.
+    static var sizes: [Kind: CGSize] {
+        [.mid: CGSize(width: 480, height: (480 / Screen.aspect).rounded()),
+         .hires: CGSize(width: 3840, height: (3840 / Screen.aspect).rounded())]
+    }
     /// Bytes per cache. The app may use about 2 GB on an Apple TV before the system ends it;
     /// these plus the atlas (~170 MB for 6,000 photos) stay well under that. A screen holds at
     /// most ~350 tiles large enough for the 480 px version (~1 MB each with mipmaps); a full

@@ -4,6 +4,16 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.10.0] – 2026-11-19
+### Added
+- **Mac app**: a native macOS version of the Apple TV app that reads an album, or the newest photos, straight from the Photos library, so it needs no export, library build or local server. It keeps the display's shape (16:10 on most Macs) and has the browser's keys: F full screen, Space pause, N or → next photo, S settings. The display stays awake while it plays. `tvos/build-mac.sh` builds a universal copy into `dist/` (app and zip) to share; it's signed ad hoc, so on another Mac it's allowed once with *Open Anyway*. See `docs/mac.md`.
+- Both apps: **Recent photos**, the newest 5,000 photos of the library, at the top of the album list, for people who don't keep albums. It's also the last fallback when no album is found, after the largest library album (100+ photos), which is new too.
+- Both apps: a small credit in the bottom-right corner ("Created by Mario Alonso with Claude Code · www.looking4nature.com"; a link on the Mac).
+
+### Changed
+- Apple TV: the code the two apps share moved to `tvos/Shared/`; screen shape, atlas slots and texture sizes now follow the screen instead of assuming 16:9 (unchanged on the TV).
+- Mac app: zooms in by default (the Apple TV keeps Alternate).
+
 ## [0.9.4] – 2026-11-19
 ### Changed
 - Apple TV: going into the background (another app in front), the app frees its loaded photos (~800 MB), keeping only the tile atlas. tvOS closes the largest suspended apps first when memory runs short, so Photomosaic was often closed and started over from the beginning; now it usually resumes where it was. Back in front, the full-size photos around the current spot reload straight away. Both events are noted in the memory log.

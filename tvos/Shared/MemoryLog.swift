@@ -10,8 +10,7 @@ import Foundation
 
 @MainActor
 enum MemoryLog {
-    static let file = FileManager.default
-        .urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("memory.log")
+    static let file = AppFiles.caches.appendingPathComponent("memory.log")
 
     /// The app's physical footprint in MB.
     static func footprint() -> Int {

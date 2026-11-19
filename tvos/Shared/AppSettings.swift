@@ -17,7 +17,7 @@ final class AppSettings: ObservableObject {
     @Published var tint: Int { didSet { store.set(tint, forKey: "tint") } }
     /// Photo caption: "off", "date" or "place" (date and place).
     @Published var caption: String { didSet { store.set(caption, forKey: "caption") } }
-    /// Photo framing: "smart" (keep each photo's subject in the 16:9 crop) or "centre".
+    /// Photo framing: "smart" (keep each photo's subject in the screen-shaped crop) or "centre".
     @Published var framing: String { didSet { store.set(framing, forKey: "framing") } }
     /// PhotoKit album identifier; empty = the album named PhotoLibrary.preferredAlbum
     /// ("Portfolio", library album before shared), else the largest shared album.
@@ -29,7 +29,11 @@ final class AppSettings: ObservableObject {
     static let tints = [0, 10, 20, 30]
 
     init() {
+        #if os(macOS)
+        direction = store.string(forKey: "direction") ?? "in"
+        #else
         direction = store.string(forKey: "direction") ?? "alternate"
+        #endif
         grid = store.object(forKey: "grid") as? Int ?? 120
         duration = store.object(forKey: "duration") as? Int ?? 22
         hold = store.object(forKey: "hold") as? Int ?? 3
