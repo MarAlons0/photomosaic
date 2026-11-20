@@ -8,9 +8,9 @@ struct Watermark: View {
         VStack(alignment: .trailing, spacing: 2) {
             Text("Created by Mario Alonso with Claude Code")
             #if os(macOS)
-            Link("www.looking4nature.com", destination: URL(string: "https://www.looking4nature.com")!)
+            Link("https://looking4nature.com", destination: URL(string: "https://looking4nature.com")!)
             #else
-            Text("www.looking4nature.com")   // no browser on the Apple TV
+            Text("https://looking4nature.com")   // no browser on the Apple TV
             #endif
         }
         #if os(tvOS)

@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.11.1] – 2026-11-19
+### Changed
+- All versions: the credit's web address reads https://looking4nature.com (was www.looking4nature.com).
+
 ## [0.11.0] – 2026-11-19
 ### Added
 - **Browser version online** at https://maralons0.github.io/photomosaic/ (GitHub Pages, from `main`), for people who can't install apps: they pick a folder of photos and nothing is uploaded. The online copy has no built library, so it offers the folder picker and demo scenes. `.nojekyll` serves the files as they are.
