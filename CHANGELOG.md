@@ -4,7 +4,12 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
-## [Unreleased]
+## [0.11.0] – 2026-11-19
+### Added
+- **Browser version online** at https://maralons0.github.io/photomosaic/ (GitHub Pages, from `main`), for people who can't install apps: they pick a folder of photos and nothing is uploaded. The online copy has no built library, so it offers the folder picker and demo scenes. `.nojekyll` serves the files as they are.
+- Browser: a short how-to on the intro screen for exporting an album from Apple Photos to a folder, and a note that photos stay on the computer.
+- Browser: the credit in the bottom-right corner, as in the apps. It shows while the mosaic plays and gives way to the controls when they appear.
+
 ### Changed
 - `tvos/build-mac.sh` builds in a temporary folder that's deleted afterwards, so `dist/` holds only `Photomosaic.app` and the zip (plus `build.log` when a build fails), and no stray copies of the app show up in Spotlight.
 

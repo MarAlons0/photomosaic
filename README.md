@@ -7,6 +7,9 @@ shrinks into a tile of the next) or alternate between the two.
 
 No build step, no server, no dependencies in the browser. Plain HTML + JavaScript.
 
+**Try it online:** https://maralons0.github.io/photomosaic/ — choose a folder of photos (exported
+from Apple Photos, for example). Your photos stay on your computer; nothing is uploaded.
+
 ## Quick start
 
 1. Open `index.html` in Safari or Chrome.

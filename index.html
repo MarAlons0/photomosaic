@@ -41,6 +41,17 @@
   button.primary { background: var(--accent); color: #1a1205; border-color: transparent; font-weight: 600; }
   button.primary:hover:not(:disabled) { background: #f0b456; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 18px; }
+  .howto { margin-top: 18px; font-size: 13px; color: var(--muted); }
+  .howto summary { cursor: pointer; color: var(--text); }
+  .howto ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+  .howto kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+  /* Credit, bottom right while playing; it gives way to the controls when they show. */
+  #watermark { position: fixed; right: 20px; bottom: 18px; z-index: 3; text-align: right; font-size: 12px;
+    line-height: 1.45; color: rgba(255,255,255,0.55); text-shadow: 0 0 3px rgba(0,0,0,0.8);
+    opacity: 0; transition: opacity .4s; pointer-events: none; }
+  #watermark a { color: inherit; text-decoration: none; pointer-events: auto; }
+  #watermark a:hover { text-decoration: underline; }
+  body.idle #watermark { opacity: 1; }
   .hint kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
   #progress { margin-top: 16px; font-size: 14px; color: var(--accent); }
 
@@ -91,12 +102,24 @@
       <button id="use-demo">Try it with demo scenes</button>
     </div>
     <div id="progress" hidden></div>
-    <div class="hint">Or drop photos / a folder anywhere. A few hundred photos works best.<br>
+    <details class="howto">
+      <summary>Photos in Apple Photos? Export a folder first</summary>
+      <ol>
+        <li>In Photos, open an album and select its photos (<kbd>⌘ A</kbd>).</li>
+        <li>Choose <b>File → Export → Export Photos…</b>, set <b>Size: Medium</b>, and click Export.</li>
+        <li>Make a new folder for them, then pick that folder here with <b>Choose a folder of photos…</b>.</li>
+      </ol>
+    </details>
+    <div class="hint">Or drop photos or a folder anywhere. A few hundred to 2,000 photos work best; smaller files load faster.<br>
+      Your photos stay on your computer: your browser reads them here and nothing is uploaded.<br>
       Keys: <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pause · <kbd>N</kbd> next · <kbd>S</kbd> settings</div>
     <input id="folder-input" type="file" webkitdirectory multiple hidden>
     <input id="files-input" type="file" accept="image/*" multiple hidden>
   </div>
 </section>
+
+<div id="watermark">Created by Mario Alonso with Claude Code<br>
+  <a href="https://www.looking4nature.com" target="_blank" rel="noopener">www.looking4nature.com</a></div>
 
 <div id="hud">
   <button id="btn-load" title="Load other photos">⌂</button>
@@ -163,9 +186,9 @@
 <div id="photo-caption" aria-live="polite"></div>
 <div id="toast"></div>
 
-<script src="js/core.js?v=0.10.0"></script>
-<script src="js/library.js?v=0.10.0"></script>
-<script src="js/player.js?v=0.10.0"></script>
-<script src="js/app.js?v=0.10.0"></script>
+<script src="js/core.js?v=0.11.0"></script>
+<script src="js/library.js?v=0.11.0"></script>
+<script src="js/player.js?v=0.11.0"></script>
+<script src="js/app.js?v=0.11.0"></script>
 </body>
 </html>
