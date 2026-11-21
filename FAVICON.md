@@ -106,7 +106,21 @@ Place `favicon.ico`, `favicon-16.png`, `favicon-32.png`, and `apple-touch-icon.p
 ### GitHub Pages **project** sites (`user.github.io/repo/`)
 Root requests resolve to `user.github.io/favicon.ico`, which belongs to a *different* repo,
 so root serving is unreliable. Rely on the `<link>` tags with paths relative to the project
-subpath. (Acceptable — tab icons work; bookmark icons are best-effort here.)
+subpath. Tab icons work this way.
+
+Bookmark icons don't once an account has more than one project site. All of them live on
+the same host (`user.github.io`), and Safari keeps **one bookmark icon per host** (the same
+rule as local apps, below). Safari does pick up a project site's
+`<link rel="apple-touch-icon">`, even with the root returning 404, but it files the icon
+under the host, so whichever app's icon Safari saved last shows on every app's Favorite.
+Seen: the 7 Fichas Favorites (`maralons0.github.io/domino-advisor/`) showing Photomosaic's
+icon (`maralons0.github.io/photomosaic/`). A root `apple-touch-icon.png` served from a
+`user.github.io` repo doesn't help; it would only give every project site the same icon.
+
+An app whose bookmark icon matters needs its own host: a custom domain (a `CNAME` file in
+the repo plus a DNS record) or another static host (Cloudflare Pages gives `name.pages.dev`).
+A new host is a new origin, so whatever the browser keeps per site (localStorage, IndexedDB,
+the service worker, an installed PWA) starts empty there. Move the app that keeps no such data.
 
 ### Local apps (`localhost:<port>`) — one host name per app
 Safari keeps **one bookmark icon per host name and ignores the port**. Every app served on
@@ -149,6 +163,16 @@ Safari caches bookmark icons **including failures**. After fixing the server, ex
 bookmarks will still look broken until you reset the cache. Either:
 
 - **Per bookmark:** delete it and re-add — Safari only fetches the icon on first save.
+- **One host:** quit Safari, then remove that host's row and image (the image file is named
+  after the uppercase MD5 of the host name):
+  ```bash
+  host=maralons0.github.io
+  dir=~/Library/Safari/Touch\ Icons\ Cache
+  sqlite3 "$dir/TouchIconCacheSettings.db" "delete from cache_settings where host='$host';"
+  rm -f "$dir/Images/$(printf %s "$host" | md5 | tr a-f A-F).png"
+  ```
+  Then open the app whose icon should show first. On a host that several apps share, this
+  lasts only until Safari saves another app's icon there.
 - **Fleet-wide:** quit Safari, then:
   ```bash
   rm -rf ~/Library/Safari/Touch\ Icons\ Cache ~/Library/Safari/Favicon\ Cache
