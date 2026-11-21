@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.11.2] – 2026-11-21
+### Changed
+- Browser: the intro screen's export how-to works for any photo app ("Photos in a photo app? Export a folder first"), with the Apple Photos menu as an example, instead of assuming a Mac.
+
 ## [0.11.1] – 2026-11-19
 ### Changed
 - All versions: the credit's web address reads https://looking4nature.com (was www.looking4nature.com).
