@@ -1,10 +1,11 @@
 # Photomosaic — Backlog
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-21_
 
 ## 🔴 High
 - [ ] **Verify in WebViewScreenSaver** — confirm `file://…/index.html?saver=1` runs as a macOS screen saver; fall back to a localhost server if not. The decode hang that produced the same blank page is fixed in v0.6.2 ([docs/decode-hang.md](docs/decode-hang.md)). `[chore]`
 
 ## 🟡 Medium
+- [ ] **Own host: photomosaic.looking4nature.com** — move the online version off `maralons0.github.io` so 7 Fichas gets its own Safari bookmark icon. See [docs/own-host.md](docs/own-host.md). `[chore]`
 - [ ] **Matcher in a Web Worker** — keep mosaic building off the main thread for 200-row grids; less urgent once the rotating pool caps the match size. `[feature]`
 - [ ] **Direct Photos export helper** — script using `osxphotos` to export an album straight into `library/`. `[feature]`
 
