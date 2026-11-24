@@ -1,7 +1,7 @@
 # Move the online Photomosaic to its own host
 
 Target: **https://photomosaic.looking4nature.com/** (confirm the subdomain before starting).
-Status: planned, not started.
+Status: shipped in v0.11.3 (2026-11-24). DNS is on WordPress.com's nameservers, so the CNAME lives there.
 
 ## Why
 

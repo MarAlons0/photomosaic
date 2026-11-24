@@ -4,6 +4,10 @@ All notable changes to Photomosaic are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 this project adheres to [Semantic Versioning](https://semver.org/) per `VERSIONING.md`.
 
+## [0.11.3] – 2026-11-24
+### Changed
+- **Browser version online moved to its own address:** https://photomosaic.looking4nature.com/ (a `CNAME` file tells GitHub Pages to serve it there). The old address, https://maralons0.github.io/photomosaic/, redirects to it. Safari keeps one bookmark icon per host, and 7 Fichas shares the old host, so each app now gets its own icon. Because it's a new site, slider settings saved in the browser start fresh once.
+
 ## [0.11.2] – 2026-11-21
 ### Changed
 - Browser: the intro screen's export how-to works for any photo app ("Photos in a photo app? Export a folder first"), with the Apple Photos menu as an example, instead of assuming a Mac.
